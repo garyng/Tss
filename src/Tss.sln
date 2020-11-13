@@ -7,10 +7,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tss.Core", "Tss.Core\Tss.Co
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tss.Cli", "Tss.Cli\Tss.Cli.csproj", "{6B8F9C27-7BC0-470E-9C55-5922BE36537B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tss.Unmanaged", "Tss.Unmanaged\Tss.Unmanaged.csproj", "{3B57B731-DC99-46F9-B7BF-36869A000A50}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tss.Poc.Dll", "Tss.Poc.Dll\Tss.Poc.Dll.csproj", "{D63D9DC6-0E1A-4907-BD5B-20F7B7591A2D}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,14 +21,6 @@ Global
 		{6B8F9C27-7BC0-470E-9C55-5922BE36537B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6B8F9C27-7BC0-470E-9C55-5922BE36537B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6B8F9C27-7BC0-470E-9C55-5922BE36537B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3B57B731-DC99-46F9-B7BF-36869A000A50}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3B57B731-DC99-46F9-B7BF-36869A000A50}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3B57B731-DC99-46F9-B7BF-36869A000A50}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3B57B731-DC99-46F9-B7BF-36869A000A50}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D63D9DC6-0E1A-4907-BD5B-20F7B7591A2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D63D9DC6-0E1A-4907-BD5B-20F7B7591A2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D63D9DC6-0E1A-4907-BD5B-20F7B7591A2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D63D9DC6-0E1A-4907-BD5B-20F7B7591A2D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
