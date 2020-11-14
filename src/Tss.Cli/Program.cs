@@ -45,15 +45,6 @@ namespace Tss.Cli
 	public class Startup
 	{
 		private readonly StandaloneTssService _service;
-		//private readonly IOptions<TssConfig> _config;
-		//private readonly IOptionsMonitor<TssPlaylistMapping> _mappings;
-
-		//public Startup(IOptions<TssConfig> config, IOptionsMonitor<TssPlaylistMapping> mappings)
-		//{
-		//	_config = config;
-		//	_mappings = mappings;
-		//	//_service = service;
-		//}
 
 		public Startup(StandaloneTssService service)
 		{
