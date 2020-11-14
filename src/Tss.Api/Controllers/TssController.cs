@@ -7,8 +7,6 @@ using Tss.Core;
 
 namespace Tss.Api.Controllers
 {
-
-
 	[ApiController]
 	[Route("[action]")]
 	public class TssController : ControllerBase
