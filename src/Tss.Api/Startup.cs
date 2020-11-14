@@ -27,7 +27,6 @@ namespace Tss.Api
 
 		public void ConfigureServices(IServiceCollection services)
 		{
-
 			services.AddControllers();
 			services.AddSwaggerGen(c =>
 			{
@@ -39,12 +38,13 @@ namespace Tss.Api
 				c.IncludeXmlComments(xmlPath);
 			});
 
-			
 			services.AddSingleton<TssService>();
 
-			var config = Configuration.GetSection(nameof(TssConfig))
-				.Get<TssConfig>();
-			services.AddSingleton(config);
+			var tssConfig = Configuration.GetSection(nameof(TssConfig));
+			services.Configure<TssConfig>(tssConfig);
+
+			var mappingsConfig = Configuration.GetSection(nameof(TssMappings));
+			services.Configure<TssMappings>(mappingsConfig);
 
 		}
 

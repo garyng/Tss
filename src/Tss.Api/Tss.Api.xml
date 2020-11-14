@@ -21,5 +21,11 @@
             </summary>
             <returns></returns>
         </member>
+        <member name="M:Tss.Api.Controllers.TssController.MoveCurrentToNotGood">
+            <summary>
+            Move the currently playing song to the "not good" list.
+            </summary>
+            <returns></returns>
+        </member>
     </members>
 </doc>
