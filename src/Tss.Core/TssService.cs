@@ -10,78 +10,33 @@ using SpotifyAPI.Web.Auth;
 
 namespace Tss.Core
 {
-	
-	public class TssService
+	public class TssConfig
 	{
-		private readonly string _credentialsPath;
-		private PKCEAuthenticator _authenticator;
-		private SpotifyClient _client;
+		public string ClientId { get; set; }
+	}
 
-		// todo: don't commit!
-		// todo: pass in as config
-		private const string CLIENT_ID = "xxx";
-		private const string CALLBACK_URL = "http://localhost:8123/callback";
-		private const int CALLBACK_PORT = 8123;
+	public class TssLoginFlow
+	{
+		private readonly string _clientId;
+		private readonly Uri _callbackUrl;
+		private string _verifier;
 
-
-		public TssService(string credentialsPath)
+		public TssLoginFlow(string clientId, string callbackUrl)
 		{
-			_credentialsPath = credentialsPath;
+			_clientId = clientId;
+			_callbackUrl = new Uri(callbackUrl);
 		}
 
-		public async Task Init()
+		/// <summary>
+		/// Start a new authentication flow.
+		/// </summary>
+		/// <returns>The login url</returns>
+		public async Task<string> Start()
 		{
-			(_authenticator, _client) = await CreateClient();
-		}
-
-		private async Task<(PKCEAuthenticator authenticator, SpotifyClient client)> CreateClient()
-		{
-			var token = File.Exists(_credentialsPath) switch
-			{
-				true => await LoadToken(),
-				false => await TryLogin()
-			};
-
-			var authenticator = new PKCEAuthenticator(CLIENT_ID, token);
-			authenticator.TokenRefreshed += async (_, t) => await SaveToken(t);
-
-			var config = SpotifyClientConfig.CreateDefault()
-				.WithAuthenticator(authenticator);
-
-			var client = new SpotifyClient(config);
-			return (authenticator, client);
-		}
-
-		private async Task<PKCETokenResponse> LoadToken()
-		{
-			var json = await File.ReadAllTextAsync(_credentialsPath);
-			return JsonConvert.DeserializeObject<PKCETokenResponse>(json);
-		}
-
-		private async Task SaveToken(PKCETokenResponse token)
-		{
-			var json = JsonConvert.SerializeObject(token);
-			await File.WriteAllTextAsync(_credentialsPath, json);
-		}
-
-		private async Task<PKCETokenResponse> TryLogin()
-		{
-			var server = new EmbedIOAuthServer(new Uri(CALLBACK_URL), CALLBACK_PORT);
 			var (verifier, challenge) = PKCEUtil.GenerateCodes();
+			_verifier = verifier;
 
-			await server.Start();
-
-			var tokenSource = new TaskCompletionSource<PKCETokenResponse>();
-			server.AuthorizationCodeReceived += async (_, response) =>
-			{
-				await server.Stop();
-				var t = await new OAuthClient().RequestToken(
-					new PKCETokenRequest(CLIENT_ID, response.Code, server.BaseUri, verifier)
-				);
-				tokenSource.SetResult(t);
-			};
-
-			var request = new LoginRequest(server.BaseUri, CLIENT_ID, LoginRequest.ResponseType.Code)
+			var request = new LoginRequest(_callbackUrl, _clientId, LoginRequest.ResponseType.Code)
 			{
 				CodeChallenge = challenge,
 				CodeChallengeMethod = "S256",
@@ -93,16 +48,87 @@ namespace Tss.Core
 				}
 			};
 
-			var uri = request.ToUri();
-			BrowserUtil.Open(uri);
-
-			var token = await tokenSource.Task;
-			await SaveToken(token);
-			server.Dispose();
-			return token;
+			return request.ToUri().ToString();
 		}
 
-		public async Task MoveToGoodPlaylist()
+		/// <summary>
+		/// Finish the authentication flow.
+		/// </summary>
+		/// <returns>Token</returns>
+		public async Task<PKCETokenResponse> Complete(string code)
+		{
+			return await new OAuthClient().RequestToken(
+				new PKCETokenRequest(_clientId, code, _callbackUrl, _verifier)
+			);
+		}
+	}
+
+	public class TssService
+	{
+		private const string CREDENTIALS_PATH = "/data/credentials.json";
+		private const string CALLBACK_URL = "http://localhost:8123/callback";
+
+
+		private string _clientId;
+		private TssLoginFlow _loginFlow;
+		private SpotifyClient _client;
+
+		public TssService(TssConfig config)
+		{
+			_clientId = config.ClientId;
+		}
+
+		public async Task<(bool success, string? loginUrl)> TryLogin()
+		{
+			if (File.Exists(CREDENTIALS_PATH))
+			{
+				var token = await LoadToken();
+				await CreateClient(token);
+				return (true, null);
+			}
+
+			_loginFlow = new TssLoginFlow(_clientId, CALLBACK_URL);
+			var url = await _loginFlow.Start();
+			return (false, url);
+		}
+
+		public async Task CompleteLogin(string? code, string? error)
+		{
+			// todo: handle error
+			var token = await _loginFlow?.Complete(code);
+			await CreateClient(token);
+		}
+
+		public async Task CreateClient(PKCETokenResponse token)
+		{
+			// todo: test token refresh
+			var authenticator = new PKCEAuthenticator(_clientId, token);
+			authenticator.TokenRefreshed += async (_, t) => await SaveToken(t);
+
+			var config = SpotifyClientConfig.CreateDefault()
+				.WithAuthenticator(authenticator);
+
+			// todo: save token
+			await SaveToken(token);
+			_client = new SpotifyClient(config);
+		}
+
+		private async Task<PKCETokenResponse> LoadToken()
+		{
+			var json = await File.ReadAllTextAsync(CREDENTIALS_PATH);
+			return JsonConvert.DeserializeObject<PKCETokenResponse>(json);
+		}
+		
+		private async Task SaveToken(PKCETokenResponse token)
+		{
+			Directory.CreateDirectory(Path.GetDirectoryName(CREDENTIALS_PATH));
+			var json = JsonConvert.SerializeObject(token);
+			await File.WriteAllTextAsync(CREDENTIALS_PATH, json);
+		}
+
+		// todo: _service.Current.MoveToGood()
+		// todo: _service.Previous.MoveToGood()
+		public async Task MoveCurrentToGood()
 		{
 			var goodPlaylistId = "3PuDN2O1rz5wKmAEMnendn";
 			var current = await _client.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest());
@@ -122,7 +148,6 @@ namespace Tss.Core
 
 				await _client.Player.SkipNext();
 			}
-
 		}
 	}
 }
