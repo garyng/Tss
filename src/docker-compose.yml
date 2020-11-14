@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Tss.Api/Dockerfile
     env_file: .env
-    ports:
-      - '8123:80'
+    # ports:
+    #   - '8123:80'
     volumes:
       - ../data:/data

@@ -4,7 +4,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Tss.Core;
+using Serilog;
 
 namespace Tss.Cli
 {
@@ -22,6 +24,19 @@ namespace Tss.Cli
 					{
 						config.AddYamlFile(tssConfig.MappingsPath, optional: false, reloadOnChange: true);
 					}
+				})
+				.ConfigureLogging((context, builder) =>
+				{
+					Log.Logger = new LoggerConfiguration()
+						.Enrich.FromLogContext()
+						.WriteTo.Console(
+							outputTemplate:
+							"{Level:u3}: [{Timestamp:HH:mm:ss}] {SourceContext} {Scope:lj} {NewLine}     {Message:lj}{NewLine}{Exception}{NewLine}")
+						.ReadFrom.Configuration(context.Configuration)
+						.CreateLogger();
+
+					builder.ClearProviders()
+						.AddSerilog();
 				})
 				.ConfigureServices((context, services) =>
 				{
@@ -45,15 +60,6 @@ namespace Tss.Cli
 	public class Startup
 	{
 		private readonly StandaloneTssService _service;
-		//private readonly IOptions<TssConfig> _config;
-		//private readonly IOptionsMonitor<TssPlaylistMapping> _mappings;
-
-		//public Startup(IOptions<TssConfig> config, IOptionsMonitor<TssPlaylistMapping> mappings)
-		//{
-		//	_config = config;
-		//	_mappings = mappings;
-		//	//_service = service;
-		//}
 
 		public Startup(StandaloneTssService service)
 		{
@@ -63,7 +69,7 @@ namespace Tss.Cli
 		public async Task Run()
 		{
 			await _service.Login();
-			// await _service.MoveCurrentToGood();
+			await _service.MoveCurrentToGood();
 			// await _service.MoveCurrentToNotGood();
 		}
 	}

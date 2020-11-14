@@ -1,10 +1,13 @@
 # Tss
 
+[![Docker Image Version (latest semver)](https://img.shields.io/docker/v/garyng/tss)](https://hub.docker.com/r/garyng/tss)
+![Docker Image Size (tag)](https://img.shields.io/docker/image-size/garyng/tss/latest)
+
 > This Song S**ks
 
 A dumb playlist management tool.
 
-# (My) workflow
+# (My) Workflow
 
 1. Gather a bunch of tracks into a Spotify playlist, normally called `xxx (pending)`
 1. Create two more playlists:

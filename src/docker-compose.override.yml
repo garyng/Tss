@@ -4,3 +4,8 @@ services:
   tss.api:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - '8124:80'
+    env_file: 
+      - .env
+      - override.env

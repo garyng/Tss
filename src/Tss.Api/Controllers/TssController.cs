@@ -1,6 +1,4 @@
-﻿using System;
-using System.IO;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Tss.Core;
@@ -41,7 +39,7 @@ namespace Tss.Api.Controllers
 				return Unauthorized($"Error: {error}");
 			}
 
-			await _service.CompleteLogin(code);
+			await _service.CompleteLogin(code!);
 			return Ok("Spotify Authorization was successful. You can close this tab now.");
 		}
 

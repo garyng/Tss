@@ -1,0 +1,52 @@
+name: Docker Image Build and Publish
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1 
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v0.9.5
+        with:
+          versionSpec: "5.x"
+
+      - name: Versioning
+        id: gitversion
+        uses: gittools/actions/gitversion/execute@v0.9.5
+
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: ./src/
+          file: ./src/Tss.Api/Dockerfile
+          push: true
+          tags: garyng/tss:latest, garyng/tss:${{ steps.gitversion.outputs.fullSemVer }}
+
+      - name: Release Github
+        uses: softprops/action-gh-release@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          draft: true
+          name: ${{ steps.gitversion.outputs.fullSemVer }}
+          tag_name: ${{ steps.gitversion.outputs.fullSemVer }}

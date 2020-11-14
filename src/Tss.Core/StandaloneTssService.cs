@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SpotifyAPI.Web.Auth;
 
@@ -7,10 +8,8 @@ namespace Tss.Core
 {
 	public class StandaloneTssService : TssService
 	{
-		protected const int CALLBACK_PORT = 8123;
-
-		public StandaloneTssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings) :
-			base(config, mappings)
+		public StandaloneTssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings,
+			ILogger<TssService> logger) : base(config, mappings, logger)
 		{
 		}
 
@@ -19,7 +18,7 @@ namespace Tss.Core
 		/// </summary>
 		public async Task Login()
 		{
-			var server = new EmbedIOAuthServer(new Uri(CALLBACK_URL), CALLBACK_PORT);
+			var server = new EmbedIOAuthServer(new Uri(_callbackUrl), _callbackPort);
 			await server.Start();
 
 			var auth = new TaskCompletionSource();
