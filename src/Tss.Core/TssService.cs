@@ -1,18 +1,15 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using SpotifyAPI.Web;
-using SpotifyAPI.Web.Auth;
 
 namespace Tss.Core
 {
 	public class TssConfig
 	{
 		public string ClientId { get; set; }
+		public string CredentialsPath { get; set; }
 	}
 
 	public class TssLoginFlow
@@ -65,22 +62,23 @@ namespace Tss.Core
 
 	public class TssService
 	{
-		private const string CREDENTIALS_PATH = "/data/credentials.json";
 		private const string CALLBACK_URL = "http://localhost:8123/callback";
 
-
 		private string _clientId;
+		private string _credentialsPath;
+
 		private TssLoginFlow _loginFlow;
 		private SpotifyClient _client;
 
 		public TssService(TssConfig config)
 		{
 			_clientId = config.ClientId;
+			_credentialsPath = config.CredentialsPath;
 		}
 
 		public async Task<(bool success, string? loginUrl)> TryLogin()
 		{
-			if (File.Exists(CREDENTIALS_PATH))
+			if (File.Exists(_credentialsPath))
 			{
 				var token = await LoadToken();
 				await CreateClient(token);
@@ -100,29 +98,27 @@ namespace Tss.Core
 
 		public async Task CreateClient(PKCETokenResponse token)
 		{
-			// todo: test token refresh
 			var authenticator = new PKCEAuthenticator(_clientId, token);
 			authenticator.TokenRefreshed += async (_, t) => await SaveToken(t);
 
 			var config = SpotifyClientConfig.CreateDefault()
 				.WithAuthenticator(authenticator);
 
-			// todo: save token
 			await SaveToken(token);
 			_client = new SpotifyClient(config);
 		}
 
 		private async Task<PKCETokenResponse> LoadToken()
 		{
-			var json = await File.ReadAllTextAsync(CREDENTIALS_PATH);
+			var json = await File.ReadAllTextAsync(_credentialsPath);
 			return JsonConvert.DeserializeObject<PKCETokenResponse>(json);
 		}
 		
 		private async Task SaveToken(PKCETokenResponse token)
 		{
-			Directory.CreateDirectory(Path.GetDirectoryName(CREDENTIALS_PATH));
+			Directory.CreateDirectory(Path.GetDirectoryName(_credentialsPath));
 			var json = JsonConvert.SerializeObject(token);
-			await File.WriteAllTextAsync(CREDENTIALS_PATH, json);
+			await File.WriteAllTextAsync(_credentialsPath, json);
 		}
 
 		// todo: _service.Current.MoveToGood()
