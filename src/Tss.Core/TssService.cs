@@ -16,7 +16,7 @@ namespace Tss.Core
 		protected int _callbackPort;
 
 		protected TssLoginFlow _loginFlow;
-		protected SpotifyClient _client;
+		protected SpotifyClient? _client;
 		private IOptionsMonitor<TssMappings> _mappings;
 
 		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings)
@@ -43,9 +43,9 @@ namespace Tss.Core
 			return new TryLoginResult(false, url);
 		}
 
-		public async Task CompleteLogin(string? code)
+		public async Task CompleteLogin(string code)
 		{
-			var token = await _loginFlow?.Complete(code);
+			var token = await _loginFlow!.Complete(code);
 			await CreateClient(token);
 		}
 
@@ -95,6 +95,8 @@ namespace Tss.Core
 
 		public async Task MoveCurrentTo(Func<TssMappings.Mapping, string> getPlaylistId, bool skip = true)
 		{
+			if (_client == null) return;
+
 			// todo: return track name, playlist name (source and target)?
 
 			var current = await Current();
@@ -129,6 +131,7 @@ namespace Tss.Core
 
 		private async Task TryRemoveFromPlaylist(string? playlistId, string trackUri)
 		{
+			if (_client == null) return;
 			if (string.IsNullOrEmpty(playlistId)) return;
 
 			try
@@ -146,12 +149,15 @@ namespace Tss.Core
 
 		private async Task AddToPlaylist(string playlistId, string trackUri)
 		{
+			if (_client == null) return;
 			await _client.Playlists.AddItems(playlistId, new PlaylistAddItemsRequest(new[] {trackUri}));
 		}
 
 
 		private async Task<((string name, string trackUri)? track, string? playlistId)> Current()
 		{
+			if (_client == null) return (null, null);
+
 			var current = await _client.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest());
 			var currentPlaylistId = current?.Context.Uri.Replace("spotify:playlist:", "");
 

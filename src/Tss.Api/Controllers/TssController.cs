@@ -41,7 +41,7 @@ namespace Tss.Api.Controllers
 				return Unauthorized($"Error: {error}");
 			}
 
-			await _service.CompleteLogin(code);
+			await _service.CompleteLogin(code!);
 			return Ok("Spotify Authorization was successful. You can close this tab now.");
 		}
 
