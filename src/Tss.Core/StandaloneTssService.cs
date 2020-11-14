@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SpotifyAPI.Web.Auth;
 
@@ -7,8 +8,8 @@ namespace Tss.Core
 {
 	public class StandaloneTssService : TssService
 	{
-		public StandaloneTssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings) :
-			base(config, mappings)
+		public StandaloneTssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings,
+			ILogger<TssService> logger) : base(config, mappings, logger)
 		{
 		}
 

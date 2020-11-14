@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Serilog;
 using Tss.Core;
 
 namespace Tss.Api
@@ -30,6 +31,19 @@ namespace Tss.Api
 						config.AddYamlFile(tssConfig.MappingsPath, optional: false, reloadOnChange: true);
 					}
 
+				})
+				.ConfigureLogging((context, builder) =>
+				{
+					Log.Logger = new LoggerConfiguration()
+						.Enrich.FromLogContext()
+						.WriteTo.Console(
+							outputTemplate:
+							"{Level:u3}: [{Timestamp:HH:mm:ss}] {SourceContext} {Scope:lj} {NewLine}     {Message:lj}{NewLine}{Exception}{NewLine}")
+						.ReadFrom.Configuration(context.Configuration)
+						.CreateLogger();
+
+					builder.ClearProviders()
+						.AddSerilog();
 				})
 				.ConfigureWebHostDefaults(webBuilder =>
 				{

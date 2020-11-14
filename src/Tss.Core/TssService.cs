@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using SpotifyAPI.Web;
@@ -18,10 +19,12 @@ namespace Tss.Core
 		protected TssLoginFlow _loginFlow;
 		protected SpotifyClient? _client;
 		private IOptionsMonitor<TssMappings> _mappings;
+		private readonly ILogger<TssService> _logger;
 
-		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings)
+		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings, ILogger<TssService> logger)
 		{
 			_mappings = mappings;
+			_logger = logger;
 			var c = config.Value;
 			_clientId = c.ClientId;
 			_credentialsPath = c.CredentialsPath;
@@ -34,18 +37,21 @@ namespace Tss.Core
 			if (File.Exists(_credentialsPath))
 			{
 				var token = await LoadToken();
+				_logger.LogInformation("Loaded token from '{filename}'", _credentialsPath);
 				await CreateClient(token);
 				return new TryLoginResult(true, null);
 			}
 
 			_loginFlow = new TssLoginFlow(_clientId, _callbackUrl);
 			var url = await _loginFlow.Start();
+			_logger.LogInformation("Started authentication flow");
 			return new TryLoginResult(false, url);
 		}
 
 		public async Task CompleteLogin(string code)
 		{
 			var token = await _loginFlow!.Complete(code);
+			_logger.LogInformation("Completed authentication flow");
 			await CreateClient(token);
 		}
 
@@ -72,6 +78,7 @@ namespace Tss.Core
 			EnsureDirectoryExist(_credentialsPath);
 			var json = JsonConvert.SerializeObject(token);
 			await File.WriteAllTextAsync(_credentialsPath, json);
+			_logger.LogInformation("Token saved to '{filename}'", _credentialsPath);
 		}
 
 		private void EnsureDirectoryExist(string path)
@@ -86,11 +93,13 @@ namespace Tss.Core
 		public async Task MoveCurrentToGood()
 		{
 			await MoveCurrentTo(m => m.Good, false);
+			_logger.LogInformation("Moved current to good");
 		}
 
 		public async Task MoveCurrentToNotGood()
 		{
 			await MoveCurrentTo(m => m.NotGood);
+			_logger.LogInformation("Moved current to not good");
 		}
 
 		public async Task MoveCurrentTo(Func<TssMappings.Mapping, string> getPlaylistId, bool skip = true)
