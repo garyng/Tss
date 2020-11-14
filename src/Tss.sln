@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tss.Core", "Tss.Core\Tss.Co
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tss.Cli", "Tss.Cli\Tss.Cli.csproj", "{6B8F9C27-7BC0-470E-9C55-5922BE36537B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tss.Api", "Tss.Api\Tss.Api.csproj", "{3891AB81-1640-4616-9C4C-6FBC605910D1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tss.Api", "Tss.Api\Tss.Api.csproj", "{3891AB81-1640-4616-9C4C-6FBC605910D1}"
 EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{EF382C20-9B87-4EA5-99C0-B04E7B92DE7D}"
 EndProject
