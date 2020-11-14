@@ -1,15 +1,36 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using SpotifyAPI.Web;
+using SpotifyAPI.Web.Auth;
 
 namespace Tss.Core
 {
+	// todo: use record when resharper supports it
+	//public record TryLoginResult(bool Success, string? LoginUrl);
+
+	public class TssPlaylistMapping
+	{
+		public class Mapping
+		{
+			public string Good { get; set; }
+			public string NotGood { get; set; }
+		}
+
+		public Dictionary<string, Mapping> Mappings { get; set; }
+		public Mapping Default { get; set; }
+	}
+
+
 	public class TssConfig
 	{
 		public string ClientId { get; set; }
 		public string CredentialsPath { get; set; }
+		public string MappingsPath { get; set; }
 	}
 
 	public class TssLoginFlow
@@ -60,20 +81,59 @@ namespace Tss.Core
 		}
 	}
 
+	public class StandaloneTssService : TssService
+	{
+		protected const int CALLBACK_PORT = 8123;
+
+		public StandaloneTssService(IOptions<TssConfig> config, IOptionsMonitor<TssPlaylistMapping> mappings) :
+			base(config, mappings)
+		{
+		}
+
+		/// <summary>
+		/// Encapsulate the login flow with <see cref="EmbedIOAuthServer"/>, useful for console application.
+		/// </summary>
+		public async Task Login()
+		{
+			var server = new EmbedIOAuthServer(new Uri(CALLBACK_URL), CALLBACK_PORT);
+			await server.Start();
+
+			var auth = new TaskCompletionSource();
+			server.AuthorizationCodeReceived += async (_, response) =>
+			{
+				await CompleteLogin(response.Code);
+				auth.SetResult();
+			};
+
+			var (success, url) = await TryLogin();
+			if (!success)
+			{
+				BrowserUtil.Open(new Uri(url!));
+				await auth.Task;
+			}
+
+			await server.Stop();
+			server.Dispose();
+		}
+	}
+
 	public class TssService
 	{
-		private const string CALLBACK_URL = "http://localhost:8123/callback";
+		protected const string CALLBACK_URL = "http://localhost:8123/callback";
 
-		private string _clientId;
-		private string _credentialsPath;
+		protected string _clientId;
+		protected string _credentialsPath;
 
-		private TssLoginFlow _loginFlow;
-		private SpotifyClient _client;
+		protected TssLoginFlow _loginFlow;
+		protected SpotifyClient _client;
+		private IOptionsMonitor<TssPlaylistMapping> _mappings;
 
-		public TssService(TssConfig config)
+		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssPlaylistMapping> mappings)
 		{
-			_clientId = config.ClientId;
-			_credentialsPath = config.CredentialsPath;
+			_mappings = mappings;
+			var c = config.Value;
+			_clientId = c.ClientId;
+			_credentialsPath = c.CredentialsPath;
 		}
 
 		public async Task<(bool success, string? loginUrl)> TryLogin()
@@ -113,36 +173,109 @@ namespace Tss.Core
 			var json = await File.ReadAllTextAsync(_credentialsPath);
 			return JsonConvert.DeserializeObject<PKCETokenResponse>(json);
 		}
-		
+
 		private async Task SaveToken(PKCETokenResponse token)
 		{
-			Directory.CreateDirectory(Path.GetDirectoryName(_credentialsPath));
+			EnsureDirectoryExist(_credentialsPath);
 			var json = JsonConvert.SerializeObject(token);
 			await File.WriteAllTextAsync(_credentialsPath, json);
 		}
 
-		// todo: _service.Current.MoveToGood()
-		// todo: _service.Previous.MoveToGood()
+		private void EnsureDirectoryExist(string path)
+		{
+			var dir = Path.GetDirectoryName(path);
+			if (!Directory.Exists(dir))
+			{
+				Directory.CreateDirectory(dir);
+			}
+		}
+
 		public async Task MoveCurrentToGood()
 		{
-			var goodPlaylistId = "3PuDN2O1rz5wKmAEMnendn";
-			var current = await _client.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest());
+			await MoveCurrentTo(m => m.Good);
+		}
 
-			if (current.Item is FullTrack track)
+		public async Task MoveCurrentToNotGood()
+		{
+			await MoveCurrentTo(m => m.NotGood);
+		}
+
+		public async Task MoveCurrentTo(Func<TssPlaylistMapping.Mapping, string> getPlaylistId)
+		{
+			// todo: return track name, playlist name (source and target)?
+
+			var current = await Current();
+
+			var targetPlaylistId = GetTargetPlaylistId(current.playlistId, getPlaylistId);
+
+			if (!current.track.HasValue) return;
+
+			var (name, trackUri) = current.track.Value;
+
+			await TryRemoveFromPlaylist(current.playlistId, trackUri);
+			await AddToPlaylist(targetPlaylistId, trackUri);
+
+			await _client.Player.SkipNext();
+		}
+
+
+		private string GetTargetPlaylistId(string? currentPlaylistId, Func<TssPlaylistMapping.Mapping, string> select)
+		{
+			var mappings = _mappings.CurrentValue;
+
+			if (currentPlaylistId == null)  return select(mappings.Default);
+
+			var found = mappings.Mappings.TryGetValue(currentPlaylistId, out var target);
+			if (!found) target = mappings.Default;
+
+			return select(target!);
+		}
+
+		private async Task TryRemoveFromPlaylist(string? playlistId, string trackUri)
+		{
+			if (string.IsNullOrEmpty(playlistId)) return;
+
+			try
 			{
-				// todo: context will be null if not inside playlist
-				var currentPlaylistId = current?.Context.Uri.Replace("spotify:playlist:", "");
-
-				// todo: can't remove item from tracks you dont' own, eg: other playlist/radio
-				await _client.Playlists.RemoveItems(currentPlaylistId, new PlaylistRemoveItemsRequest
+				await _client.Playlists.RemoveItems(playlistId, new PlaylistRemoveItemsRequest
 				{
-					Tracks = new[] { new SpotifyAPI.Web.PlaylistRemoveItemsRequest.Item() { Uri = track.Uri } }
+					Tracks = new[] {new SpotifyAPI.Web.PlaylistRemoveItemsRequest.Item() {Uri = trackUri}}
 				});
-
-				await _client.Playlists.AddItems(goodPlaylistId, new PlaylistAddItemsRequest(new[] { track.Uri }));
-
-				await _client.Player.SkipNext();
 			}
+			catch (Exception)
+			{
+				// todo: log
+			}
+		}
+
+		private async Task AddToPlaylist(string playlistId, string trackUri)
+		{
+			await _client.Playlists.AddItems(playlistId, new PlaylistAddItemsRequest(new[] {trackUri}));
+		}
+
+
+		private async Task<((string name, string trackUri)? track, string? playlistId)> Current()
+		{
+			var current = await _client.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest());
+			var currentPlaylistId = current?.Context.Uri.Replace("spotify:playlist:", "");
+
+			return current?.Item switch
+			{
+				FullTrack track => ((track.Name, track.Uri), currentPlaylistId),
+				FullEpisode episode => ((episode.Name, episode.Uri), currentPlaylistId),
+				_ => (null, null)
+			};
+		}
+
+		private async Task<((string name, string trackUri)? track, string? playlistId)> Previous()
+		{
+			var previousTrack = (await _client.Player.GetRecentlyPlayed(new PlayerRecentlyPlayedRequest
+			{
+				Limit = 1
+			}))?.Items?.FirstOrDefault();
+
+			throw new NotImplementedException("Recently played is not recent enough...");
+
 		}
 	}
 }
