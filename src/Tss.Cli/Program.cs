@@ -28,8 +28,8 @@ namespace Tss.Cli
 					var tssConfig = context.Configuration.GetSection(nameof(TssConfig));
 					services.Configure<TssConfig>(tssConfig);
 
-					var mappingsConfig = context.Configuration.GetSection("TssMappings");
-					services.Configure<TssPlaylistMapping>(mappingsConfig);
+					var mappingsConfig = context.Configuration.GetSection(nameof(TssMappings));
+					services.Configure<TssMappings>(mappingsConfig);
 
 					services.AddSingleton<StandaloneTssService>();
 					services.AddSingleton<Startup>();

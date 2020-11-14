@@ -13,7 +13,7 @@ namespace Tss.Core
 	// todo: use record when resharper supports it
 	//public record TryLoginResult(bool Success, string? LoginUrl);
 
-	public class TssPlaylistMapping
+	public class TssMappings
 	{
 		public class Mapping
 		{
@@ -85,7 +85,7 @@ namespace Tss.Core
 	{
 		protected const int CALLBACK_PORT = 8123;
 
-		public StandaloneTssService(IOptions<TssConfig> config, IOptionsMonitor<TssPlaylistMapping> mappings) :
+		public StandaloneTssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings) :
 			base(config, mappings)
 		{
 		}
@@ -126,9 +126,9 @@ namespace Tss.Core
 
 		protected TssLoginFlow _loginFlow;
 		protected SpotifyClient _client;
-		private IOptionsMonitor<TssPlaylistMapping> _mappings;
+		private IOptionsMonitor<TssMappings> _mappings;
 
-		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssPlaylistMapping> mappings)
+		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings)
 		{
 			_mappings = mappings;
 			var c = config.Value;
@@ -192,7 +192,7 @@ namespace Tss.Core
 
 		public async Task MoveCurrentToGood()
 		{
-			await MoveCurrentTo(m => m.Good);
+			await MoveCurrentTo(m => m.Good, false);
 		}
 
 		public async Task MoveCurrentToNotGood()
@@ -200,7 +200,7 @@ namespace Tss.Core
 			await MoveCurrentTo(m => m.NotGood);
 		}
 
-		public async Task MoveCurrentTo(Func<TssPlaylistMapping.Mapping, string> getPlaylistId)
+		public async Task MoveCurrentTo(Func<TssMappings.Mapping, string> getPlaylistId, bool skip = true)
 		{
 			// todo: return track name, playlist name (source and target)?
 
@@ -219,7 +219,7 @@ namespace Tss.Core
 		}
 
 
-		private string GetTargetPlaylistId(string? currentPlaylistId, Func<TssPlaylistMapping.Mapping, string> select)
+		private string GetTargetPlaylistId(string? currentPlaylistId, Func<TssMappings.Mapping, string> select)
 		{
 			var mappings = _mappings.CurrentValue;
 
@@ -274,7 +274,7 @@ namespace Tss.Core
 				Limit = 1
 			}))?.Items?.FirstOrDefault();
 
-			throw new NotImplementedException("Recently played is not recent enough...");
+			throw new NotImplementedException("Recently played is not recent enough.");
 
 		}
 	}
