@@ -215,7 +215,10 @@ namespace Tss.Core
 			await TryRemoveFromPlaylist(current.playlistId, trackUri);
 			await AddToPlaylist(targetPlaylistId, trackUri);
 
-			await _client.Player.SkipNext();
+			if (skip)
+			{
+				await _client.Player.SkipNext();
+			}
 		}
 
 
