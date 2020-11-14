@@ -37,11 +37,17 @@ namespace Tss.Api.Controllers
 		}
 
 		[HttpGet]
-		public async Task<string> Callback([FromQuery] string? code, [FromQuery] string? error)
+		[ProducesResponseType(StatusCodes.Status200OK)]
+		[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+		public async Task<ActionResult<string>> Callback([FromQuery] string? code, [FromQuery] string? error)
 		{
-			// todo: on error return different code
-			await _service.CompleteLogin(code, error);
-			return "Spotify Authorization was successful. You can close this tab now.";
+			if (!string.IsNullOrEmpty(error))
+			{
+				return Unauthorized($"Error: {error}");
+			}
+
+			await _service.CompleteLogin(code);
+			return Ok("Spotify Authorization was successful. You can close this tab now.");
 		}
 
 		[HttpPost]

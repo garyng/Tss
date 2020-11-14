@@ -92,9 +92,8 @@ namespace Tss.Core
 			return (false, url);
 		}
 
-		public async Task CompleteLogin(string? code, string? error)
+		public async Task CompleteLogin(string? code)
 		{
-			// todo: handle error
 			var token = await _loginFlow?.Complete(code);
 			await CreateClient(token);
 		}
