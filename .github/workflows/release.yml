@@ -39,43 +39,14 @@ jobs:
         with:
           context: ./src/
           file: ./src/Tss.Api/Dockerfile
-          # platforms: linux/amd64,linux/arm64,linux/386
           push: true
           tags: garyng/tss:latest, garyng/tss:${{ steps.gitversion.outputs.fullSemVer }}
 
-
-
-      # - name: Create directory
-      #   run: |
-      #     md -Force ${{ env.artifacts-dir }}
-      #   shell: pwsh
-
-      # - name: Set variable
-      #   id: vars
-      #   run: echo "::set-output name=filepath::${{ env.artifacts-dir }}${{ env.archive-name }}-${{ steps.gitversion.outputs.fullSemVer }}.zip" 
-  
-      # - name: Zip
-      #   run: |
-      #     Compress-Archive -Path ${{ env.out-dir }}/* -DestinationPath ${{ steps.vars.outputs.filepath }}
-      #   shell: pwsh
-
-      # - name: Hash
-      #   run: |
-      #     $hash = $(Get-FileHash ${{ steps.vars.outputs.filepath }}).Hash
-      #     $hash | Set-Content ${{ steps.vars.outputs.filepath }}.sha256
-      #   shell: pwsh
-
-      # - name: Upload Artifacts
-      #   uses: actions/upload-artifact@v2
-      #   with:
-      #     path: ${{ env.artifacts-dir }}
-
-      # - name: Release Github
-      #   uses: softprops/action-gh-release@master
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     draft: true
-      #     files: "${{ env.artifacts-dir }}/*"
-      #     name: ${{ steps.gitversion.outputs.fullSemVer }}
-      #     tag_name: ${{ steps.gitversion.outputs.fullSemVer }}
+      - name: Release Github
+        uses: softprops/action-gh-release@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          draft: true
+          name: ${{ steps.gitversion.outputs.fullSemVer }}
+          tag_name: ${{ steps.gitversion.outputs.fullSemVer }}
