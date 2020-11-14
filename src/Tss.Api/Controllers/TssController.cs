@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Tss.Core;
 
@@ -11,7 +12,8 @@ namespace Tss.Api.Controllers
 		public bool Success { get; set; }
 		public string? LoginUrl { get; set; }
 	}
-
+	
+	// todo: enable xml comments for swagger
 
 	[ApiController]
 	[Route("[action]")]
@@ -24,6 +26,10 @@ namespace Tss.Api.Controllers
 			_service = service;
 		}
 
+		/// <summary>
+		/// Try logging in. A login url is returned if the login failed.
+		/// </summary>
+		/// <returns></returns>
 		[HttpPost]
 		public async Task<TryLoginResponse> TryLogin()
 		{
@@ -36,6 +42,9 @@ namespace Tss.Api.Controllers
 			};
 		}
 
+		/// <summary>
+		/// Complete the login flow.
+		/// </summary>
 		[HttpGet]
 		[ProducesResponseType(StatusCodes.Status200OK)]
 		[ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -50,6 +59,10 @@ namespace Tss.Api.Controllers
 			return Ok("Spotify Authorization was successful. You can close this tab now.");
 		}
 
+		/// <summary>
+		/// Move the currently playing song to the "good" list.
+		/// </summary>
+		/// <returns></returns>
 		[HttpPost]
 		public async Task MoveCurrentToGood()
 		{

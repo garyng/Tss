@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Tss.Api</name>
+    </assembly>
+    <members>
+        <member name="M:Tss.Api.Controllers.TssController.TryLogin">
+            <summary>
+            Try logging in. A login url is returned if the login failed.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Tss.Api.Controllers.TssController.Callback(System.String,System.String)">
+            <summary>
+            Complete the login flow.
+            </summary>
+        </member>
+        <member name="M:Tss.Api.Controllers.TssController.MoveCurrentToGood">
+            <summary>
+            Move the currently playing song to the "good" list.
+            </summary>
+            <returns></returns>
+        </member>
+    </members>
+</doc>
