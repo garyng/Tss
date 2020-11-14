@@ -10,10 +10,10 @@ namespace Tss.Core
 {
 	public class TssService
 	{
-		protected const string CALLBACK_URL = "http://localhost:8123/callback";
-
 		protected string _clientId;
 		protected string _credentialsPath;
+		protected string _callbackUrl;
+		protected int _callbackPort;
 
 		protected TssLoginFlow _loginFlow;
 		protected SpotifyClient _client;
@@ -25,6 +25,8 @@ namespace Tss.Core
 			var c = config.Value;
 			_clientId = c.ClientId;
 			_credentialsPath = c.CredentialsPath;
+			_callbackUrl = $"http://localhost:{c.CallbackPort}/callback";
+			_callbackPort = c.CallbackPort;
 		}
 
 		public async Task<TryLoginResult> TryLogin()
@@ -36,7 +38,7 @@ namespace Tss.Core
 				return new TryLoginResult(true, null);
 			}
 
-			_loginFlow = new TssLoginFlow(_clientId, CALLBACK_URL);
+			_loginFlow = new TssLoginFlow(_clientId, _callbackUrl);
 			var url = await _loginFlow.Start();
 			return new TryLoginResult(false, url);
 		}

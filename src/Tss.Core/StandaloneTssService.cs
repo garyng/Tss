@@ -7,8 +7,6 @@ namespace Tss.Core
 {
 	public class StandaloneTssService : TssService
 	{
-		protected const int CALLBACK_PORT = 8123;
-
 		public StandaloneTssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings) :
 			base(config, mappings)
 		{
@@ -19,7 +17,7 @@ namespace Tss.Core
 		/// </summary>
 		public async Task Login()
 		{
-			var server = new EmbedIOAuthServer(new Uri(CALLBACK_URL), CALLBACK_PORT);
+			var server = new EmbedIOAuthServer(new Uri(_callbackUrl), _callbackPort);
 			await server.Start();
 
 			var auth = new TaskCompletionSource();
