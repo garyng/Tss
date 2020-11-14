@@ -29,10 +29,10 @@ namespace Tss.Core
 				auth.SetResult();
 			};
 
-			var (success, url) = await TryLogin();
-			if (!success)
+			var result = await TryLogin();
+			if (!result.Success)
 			{
-				BrowserUtil.Open(new Uri(url!));
+				BrowserUtil.Open(new Uri(result.LoginUrl!));
 				await auth.Task;
 			}
 
