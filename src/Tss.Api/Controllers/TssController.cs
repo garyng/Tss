@@ -7,13 +7,12 @@ using Tss.Core;
 
 namespace Tss.Api.Controllers
 {
-	public class TryLoginResponse
+	public class TryLoginResult
 	{
 		public bool Success { get; set; }
 		public string? LoginUrl { get; set; }
 	}
-	
-	// todo: enable xml comments for swagger
+
 
 	[ApiController]
 	[Route("[action]")]
@@ -30,12 +29,11 @@ namespace Tss.Api.Controllers
 		/// Try logging in. A login url is returned if the login failed.
 		/// </summary>
 		/// <returns></returns>
-		[HttpPost]
-		public async Task<TryLoginResponse> TryLogin()
+		[HttpGet]
+		public async Task<TryLoginResult> TryLogin()
 		{
 			var (success, loginUrl) = await _service.TryLogin();
-
-			return new TryLoginResponse
+			return new TryLoginResult
 			{
 				Success = success,
 				LoginUrl = loginUrl
@@ -63,10 +61,20 @@ namespace Tss.Api.Controllers
 		/// Move the currently playing song to the "good" list.
 		/// </summary>
 		/// <returns></returns>
-		[HttpPost]
+		[HttpGet]
 		public async Task MoveCurrentToGood()
 		{
 			await _service.MoveCurrentToGood();
+		}
+
+		/// <summary>
+		/// Move the currently playing song to the "not good" list.
+		/// </summary>
+		/// <returns></returns>
+		[HttpGet]
+		public async Task MoveCurrentToNotGood()
+		{
+			await _service.MoveCurrentToNotGood();
 		}
 	}
 }
