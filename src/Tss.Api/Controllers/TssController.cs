@@ -7,11 +7,6 @@ using Tss.Core;
 
 namespace Tss.Api.Controllers
 {
-	public class TryLoginResult
-	{
-		public bool Success { get; set; }
-		public string? LoginUrl { get; set; }
-	}
 
 
 	[ApiController]
@@ -32,12 +27,7 @@ namespace Tss.Api.Controllers
 		[HttpGet]
 		public async Task<TryLoginResult> TryLogin()
 		{
-			var (success, loginUrl) = await _service.TryLogin();
-			return new TryLoginResult
-			{
-				Success = success,
-				LoginUrl = loginUrl
-			};
+			return await _service.TryLogin();
 		}
 
 		/// <summary>
