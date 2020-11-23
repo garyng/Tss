@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -168,7 +169,7 @@ namespace Tss.Core
 			if (_client == null) return (null, null);
 
 			var current = await _client.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest());
-			var currentPlaylistId = current?.Context.Uri.Replace("spotify:playlist:", "");
+			var currentPlaylistId = Regex.Match(current?.Context.Uri ?? "", "playlist:(?<id>.*)").Groups["id"].Value;
 
 			return current?.Item switch
 			{
