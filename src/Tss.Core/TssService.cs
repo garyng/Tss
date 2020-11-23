@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -130,7 +131,7 @@ namespace Tss.Core
 		{
 			var mappings = _mappings.CurrentValue;
 
-			if (currentPlaylistId == null)  return select(mappings.Default);
+			if (currentPlaylistId == null) return select(mappings.Default);
 
 			var found = mappings.Mappings.TryGetValue(currentPlaylistId, out var target);
 			if (!found) target = mappings.Default;
@@ -145,20 +146,22 @@ namespace Tss.Core
 
 			try
 			{
+				_logger.LogInformation("Try remove {trackUri} from {playlistId}", trackUri, playlistId);
 				await _client.Playlists.RemoveItems(playlistId, new PlaylistRemoveItemsRequest
 				{
 					Tracks = new[] {new SpotifyAPI.Web.PlaylistRemoveItemsRequest.Item() {Uri = trackUri}}
 				});
 			}
-			catch (Exception)
+			catch (Exception e)
 			{
-				// todo: log
+				_logger.LogError(e, "Error removing {trackUri} from {playlistId}", trackUri, playlistId);
 			}
 		}
 
 		private async Task AddToPlaylist(string playlistId, string trackUri)
 		{
 			if (_client == null) return;
+			_logger.LogInformation("Add {trackUri} to {playlistId}", trackUri, playlistId);
 			await _client.Playlists.AddItems(playlistId, new PlaylistAddItemsRequest(new[] {trackUri}));
 		}
 
@@ -168,14 +171,17 @@ namespace Tss.Core
 			if (_client == null) return (null, null);
 
 			var current = await _client.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest());
-			var currentPlaylistId = current?.Context.Uri.Replace("spotify:playlist:", "");
+			var currentPlaylistId = Regex.Match(current?.Context.Uri ?? "", "playlist:(?<id>.*)").Groups["id"].Value;
 
-			return current?.Item switch
+			((string name, string uri)? track, string playlistId) result = current?.Item switch
 			{
 				FullTrack track => ((track.Name, track.Uri), currentPlaylistId),
 				FullEpisode episode => ((episode.Name, episode.Uri), currentPlaylistId),
 				_ => (null, null)
 			};
+			_logger.LogInformation("[Current] track: {trackName} ({trackUri}) playlist: {playlistId}",
+				result.track?.name, result.track?.uri, result.playlistId);
+			return result;
 		}
 
 		private async Task<((string name, string trackUri)? track, string? playlistId)> Previous()
@@ -186,7 +192,6 @@ namespace Tss.Core
 			}))?.Items?.FirstOrDefault();
 
 			throw new NotImplementedException("Recently played is not recent enough.");
-
 		}
 	}
 }

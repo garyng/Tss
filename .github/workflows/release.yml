@@ -40,7 +40,9 @@ jobs:
           context: ./src/
           file: ./src/Tss.Api/Dockerfile
           push: true
-          tags: garyng/tss:latest, garyng/tss:${{ steps.gitversion.outputs.fullSemVer }}
+          tags: |
+            garyng/tss:latest
+            garyng/tss:${{ steps.gitversion.outputs.fullSemVer }}
 
       - name: Release Github
         uses: softprops/action-gh-release@master
