@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -7,9 +9,65 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using SpotifyAPI.Web;
+using MoreLinq;
 
 namespace Tss.Core
 {
+	public class Track : IEquatable<Track>
+	{
+		public bool Equals(Track? other)
+		{
+			if (ReferenceEquals(null, other)) return false;
+			if (ReferenceEquals(this, other)) return true;
+			return Uri == other.Uri;
+		}
+
+		public override bool Equals(object? obj)
+		{
+			if (ReferenceEquals(null, obj)) return false;
+			if (ReferenceEquals(this, obj)) return true;
+			if (obj.GetType() != this.GetType()) return false;
+			return Equals((Track) obj);
+		}
+
+		public override int GetHashCode()
+		{
+			return Uri.GetHashCode();
+		}
+
+		public static bool operator ==(Track? left, Track? right)
+		{
+			return Equals(left, right);
+		}
+
+		public static bool operator !=(Track? left, Track? right)
+		{
+			return !Equals(left, right);
+		}
+
+		[NotNull]
+		public string Uri { get; set; }
+
+		[NotNull]
+		public string Name { get; set; }
+
+		public Track([NotNull] IPlayableItem item)
+		{
+			(Uri, Name) = item switch
+			{
+				FullTrack track => (track.Uri, track.Name),
+				FullEpisode episode => (episode.Uri, episode.Name),
+			};
+		}
+
+		public void Deconstruct(out string uri, out string name)
+		{
+			uri = Uri;
+			name = Name;
+		}
+	}
+
+
 	public class TssService
 	{
 		protected string _clientId;
@@ -192,6 +250,91 @@ namespace Tss.Core
 			}))?.Items?.FirstOrDefault();
 
 			throw new NotImplementedException("Recently played is not recent enough.");
+		}
+
+		private async Task<IEnumerable<IEnumerable<Track>>> GetTrackBatches(string playlistId, int size = 99)
+		{
+			var page = await _client.Playlists.GetItems(playlistId);
+			return await GetTrackBatches(page);
+		}
+
+		private async Task<IEnumerable<IEnumerable<Track>>> GetTrackBatches(Paging<PlaylistTrack<IPlayableItem>> page,
+			int size = 99)
+		{
+			return (await GetTracks(page))
+				.Batch(size);
+		}
+
+		private async Task<IEnumerable<Track>> GetTracks(string playlistId)
+		{
+			var page = await _client.Playlists.GetItems(playlistId);
+			return await GetTracks(page);
+		}
+
+		private async Task<IEnumerable<Track>> GetTracks(Paging<PlaylistTrack<IPlayableItem>> page)
+		{
+			return await _client.Paginate(page)
+				.Select(item => new Track(item.Track))
+				.ToListAsync();
+		}
+
+		public async Task CleanupPlaylist(string playlistId)
+		{
+			// backup playlist
+			// remove good and not good tracks from current playlist
+
+			if (_client == null) return;
+
+
+			// var current = await Current();
+			var currentPlaylistId = playlistId;
+			var currentTracks = await GetTracks(currentPlaylistId);
+
+			var good = GetTargetPlaylistId(currentPlaylistId, m => m.Good);
+			var goodTracks = await GetTracks(good);
+
+			var notGood = GetTargetPlaylistId(currentPlaylistId, m => m.NotGood);
+			var notGoodTracks = await GetTracks(notGood);
+
+			await DuplicatePlaylist(currentPlaylistId);
+
+			var cleanTracks = currentTracks.Except(goodTracks)
+				.Except(notGoodTracks);
+
+			if (cleanTracks.SequenceEqual(currentTracks)) return;
+
+			await _client.Playlists.ReplaceItems(currentPlaylistId, new PlaylistReplaceItemsRequest(new List<string>()));
+
+			await cleanTracks
+				.Batch(99)
+				.Select(ts => new PlaylistAddItemsRequest(ts.Select(t => t.Uri).ToList()))
+				.ToAsyncEnumerable()
+				.SelectAwait(async request => _client.Playlists.AddItems(currentPlaylistId, request))
+				.ToListAsync();
+		}
+
+		public async Task DuplicatePlaylist(string playlistId)
+		{
+			if (_client == null) return;
+
+
+			var playlist = await _client.Playlists.Get(playlistId);
+
+			var page = playlist.Tracks;
+
+			var name = $"{playlist.Name} ({DateTime.Now:yyyyMMdd-HHmmss})";
+
+			var backup = await _client.Playlists.Create(playlist.Owner.Id, new PlaylistCreateRequest(name));
+
+			var batches = await GetTrackBatches(page);
+
+			await batches
+				.Select(uris => new PlaylistAddItemsRequest(uris
+					.Select(t => t.Uri)
+					.ToList()))
+				.ToAsyncEnumerable()
+				.SelectAwait(async request => await _client.Playlists.AddItems(backup.Id, request))
+				.ToListAsync();
 		}
 	}
 }
