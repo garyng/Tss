@@ -103,17 +103,17 @@ namespace Tss.Core
 
 		public async Task MoveCurrentToGood()
 		{
-			await MoveCurrentTo(m => m.Good, false);
+			await MoveCurrentTo2(m => m.Good, false);
 			_logger.LogInformation("Moved current to good");
 		}
 
 		public async Task MoveCurrentToNotGood()
 		{
-			await MoveCurrentTo(m => m.NotGood);
+			await MoveCurrentTo2(m => m.NotGood);
 			_logger.LogInformation("Moved current to not good");
 		}
 
-		public async Task MoveCurrentTo(Func<TssMappings.Mapping, string> getPlaylistId, bool skip = true)
+		public async Task MoveCurrentTo2(Func<TssMappings.Mapping, string> getPlaylistId, bool skip = true)
 		{
 			if (_client == null) return;
 
@@ -121,7 +121,7 @@ namespace Tss.Core
 
 			var current = await Current2();
 
-			var targetPlaylistId = GetTargetPlaylistId(current.playlistId, getPlaylistId);
+			var targetPlaylistId = GetTargetPlaylistId2(current.playlistId, getPlaylistId);
 
 			if (!current.track.HasValue) return;
 
@@ -137,7 +137,7 @@ namespace Tss.Core
 		}
 
 
-		private string GetTargetPlaylistId(string? currentPlaylistId, Func<TssMappings.Mapping, string> select)
+		private string GetTargetPlaylistId2(string? currentPlaylistId, Func<TssMappings.Mapping, string> select)
 		{
 			var mappings = _mappings.CurrentValue;
 
