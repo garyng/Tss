@@ -230,6 +230,13 @@ namespace Tss.Core
 				.ToListAsync();
 		}
 
+		public async Task CleanupCurrentPlaylist()
+		{
+			if (_client == null) return;
+			var result = await (from current in Current.New(_client)
+				select CleanupPlaylist(current.Playlist.Id)).Try();
+		}
+
 		public async Task CleanupPlaylist(string playlistId)
 		{
 			if (_client == null) return;
