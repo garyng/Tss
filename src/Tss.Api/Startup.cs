@@ -12,7 +12,9 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using MediatR;
 using Tss.Core;
+using Tss.Core.Requests;
 
 namespace Tss.Api
 {
@@ -38,6 +40,7 @@ namespace Tss.Api
 				c.IncludeXmlComments(xmlPath);
 			});
 
+			services.AddMediatR(typeof(IMediatorMarker));
 			services.AddSingleton<TssService>();
 
 			var tssConfig = Configuration.GetSection(nameof(TssConfig));

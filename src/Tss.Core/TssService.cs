@@ -79,11 +79,14 @@ namespace Tss.Core
 		protected SpotifyClient? _client;
 		private IOptionsMonitor<TssMappings> _mappings;
 		private readonly ILogger<TssService> _logger;
+		private readonly IMediator _mediator;
 
-		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings, ILogger<TssService> logger)
+		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings, ILogger<TssService> logger,
+			IMediator mediator)
 		{
 			_mappings = mappings;
 			_logger = logger;
+			_mediator = mediator;
 			var c = config.Value;
 			_clientId = c.ClientId;
 			_credentialsPath = c.CredentialsPath;

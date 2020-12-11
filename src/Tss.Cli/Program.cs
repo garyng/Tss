@@ -1,12 +1,14 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
+using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Tss.Core;
 using Serilog;
+using Tss.Core.Requests;
 
 namespace Tss.Cli
 {
@@ -46,6 +48,8 @@ namespace Tss.Cli
 					var mappingsConfig = context.Configuration.GetSection(nameof(TssMappings));
 					services.Configure<TssMappings>(mappingsConfig);
 
+					services.AddMediatR(typeof(IMediatorMarker));
+
 					services.AddSingleton<StandaloneTssService>();
 					services.AddSingleton<Startup>();
 				}).Build();
@@ -60,10 +64,12 @@ namespace Tss.Cli
 	public class Startup
 	{
 		private readonly StandaloneTssService _service;
+		private readonly IMediator _mediator;
 
-		public Startup(StandaloneTssService service)
+		public Startup(StandaloneTssService service, IMediator mediator)
 		{
 			_service = service;
+			_mediator = mediator;
 		}
 
 		public async Task Run()
