@@ -62,5 +62,15 @@ namespace Tss.Api.Controllers
 		{
 			await _service.MoveCurrentToNotGood();
 		}
+		
+		/// <summary>
+		/// Cleanup the currently playing playlist.
+		/// </summary>
+		/// <returns></returns>
+		[HttpGet]
+		public async Task CleanupCurrentPlaylist()
+		{
+			await _service.CleanupCurrentPlaylist();
+		}
 	}
 }

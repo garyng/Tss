@@ -31,12 +31,12 @@ namespace Tss.Core.Requests
 				{
 					Tracks = new[] {new PlaylistRemoveItemsRequest.Item {Uri = track.Uri}}
 				});
+				_logger.Information("Removed {track} from {source}", track, source);
 			}
 			catch (Exception e)
 			{
 				// will throw when attempting to remove track from playlist of other user
-				_logger.Error(e, "Error while removing \"{trackName}\" ({trackUri}) from \"{sourceName}\" ({sourceId})",
-					track.Name, track.Uri, source.Name, source.Id);
+				_logger.Error(e, "Error while removing {track} from {source}", track, source);
 			}
 
 			await client.Playlists.AddItems(target.Id, new PlaylistAddItemsRequest(new[] {track.Uri}));

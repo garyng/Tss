@@ -37,5 +37,10 @@ namespace Tss.Core.Models
 			=> New(client, id, false, default);
 		
 		public TryAsync<Playlist> Refresh(ISpotifyClient client) => New(client, Id);
+
+		public override string ToString()
+		{
+			return $"\"{Name}\" ({Id})";
+		}
 	}
 }

@@ -11,7 +11,8 @@ using Tss.Core.Models;
 
 namespace Tss.Core.Requests
 {
-	public record CleanupPlaylist(SpotifyClient Client, Playlist Current, Playlist Good, Playlist NotGood) : IRequest<Void>;
+	public record CleanupPlaylist
+		(SpotifyClient Client, Playlist Current, Playlist Good, Playlist NotGood) : IRequest<Void>;
 
 	public class CleanupPlaylistRequestHandler : IRequestHandler<CleanupPlaylist, Void>
 	{
@@ -21,7 +22,7 @@ namespace Tss.Core.Requests
 		{
 			_logger = logger;
 		}
-		
+
 		public async Task<Void> Handle(CleanupPlaylist request, CancellationToken cancellationToken)
 		{
 			var (client, current, good, notGood) = request;
@@ -29,7 +30,7 @@ namespace Tss.Core.Requests
 			var cleanTracks = current.Tracks.Except(good.Tracks)
 				.Except(notGood.Tracks)
 				.ToList();
-			
+
 			if (cleanTracks.SequenceEqual(current.Tracks)) return Void.Default;
 
 			// clear playlist
@@ -43,7 +44,7 @@ namespace Tss.Core.Requests
 				.ToListAsync();
 
 			var removed = current.Tracks.Count() - cleanTracks.Count();
-			_logger.LogInformation("Removed {count} tracks from {playlistId}", removed, current.Id);
+			_logger.LogInformation("Removed {count} tracks from {playlist})", removed, current);
 
 			return Void.Default;
 		}

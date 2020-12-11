@@ -9,5 +9,10 @@ namespace Tss.Core.Models
 			FullTrack track => new (track.Uri, track.Name),
 			FullEpisode episode => new (episode.Uri, episode.Name),
 		};
+
+		public override string ToString()
+		{
+			return $"\"{Name}\" ({Uri})";
+		}
 	}
 }
