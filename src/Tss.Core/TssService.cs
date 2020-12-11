@@ -119,7 +119,7 @@ namespace Tss.Core
 
 			// todo: return track name, playlist name (source and target)?
 
-			var current = await Current();
+			var current = await Current2();
 
 			var targetPlaylistId = GetTargetPlaylistId(current.playlistId, getPlaylistId);
 
@@ -176,7 +176,7 @@ namespace Tss.Core
 		}
 
 
-		private async Task<((string name, string trackUri)? track, string? playlistId)> Current()
+		private async Task<((string name, string trackUri)? track, string? playlistId)> Current2()
 		{
 			if (_client == null) return (null, null);
 
