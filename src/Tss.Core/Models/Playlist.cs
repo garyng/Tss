@@ -22,5 +22,7 @@ namespace Tss.Core.Models
 					.Select(item => Track.New(item.Track))
 					.ToListAsync();
 		}
+
+		public TryAsync<Playlist> Refresh(ISpotifyClient client) => New(client, Id);
 	}
 }
