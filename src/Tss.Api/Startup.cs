@@ -32,7 +32,7 @@ namespace Tss.Api
 			services.AddControllers();
 			services.AddSwaggerGen(c =>
 			{
-				c.SwaggerDoc("v1", new OpenApiInfo { Title = "Tss.Api", Version = "v1" });
+				c.SwaggerDoc("v1", new OpenApiInfo {Title = "Tss.Api", Version = "v1"});
 
 				// Set the comments path for the Swagger JSON and UI.
 				var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -48,23 +48,16 @@ namespace Tss.Api
 
 			var mappingsConfig = Configuration.GetSection(nameof(TssMappings));
 			services.Configure<TssMappings>(mappingsConfig);
-
 		}
 
 		public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
 		{
-			if (env.IsDevelopment())
-			{
-				app.UseDeveloperExceptionPage();
-				app.UseSwagger();
-				app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Tss.Api v1"));
-			}
+			app.UseDeveloperExceptionPage();
+			app.UseSwagger();
+			app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Tss.Api v1"));
 
 			app.UseRouting();
-			app.UseEndpoints(endpoints =>
-			{
-				endpoints.MapControllers();
-			});
+			app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
 		}
 	}
 }
