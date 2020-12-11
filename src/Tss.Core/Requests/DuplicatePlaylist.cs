@@ -1,43 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using LanguageExt;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using MoreLinq;
 using SpotifyAPI.Web;
+using Tss.Core.Models;
 using Unit = MediatR.Unit;
 
 namespace Tss.Core.Requests
 {
-	public record Playlist(string Id, string Name, List<Track> Tracks)
-	{
-		public static TryAsync<Playlist> New(ISpotifyClient client, string id,
-			Option<Paging<PlaylistTrack<IPlayableItem>>> firstPage = default)
-		{
-			return from playlist in GetPlaylist(id)
-				let page = firstPage.IfNone(() => playlist.Tracks)
-				from tracks in GetTracks(page)
-				select new Playlist(id, playlist.Name, tracks);
-
-			TryAsync<FullPlaylist> GetPlaylist(string id) => async () => await client.Playlists.Get(id);
-
-			TryAsync<List<Track>> GetTracks(Paging<PlaylistTrack<IPlayableItem>> page) => async () =>
-				await client.Paginate(page)
-					.Select(item => new Track(item.Track))
-					.ToListAsync();
-		}
-	}
-
-	public static class MediatorExtensions
-	{
-		public static TryAsync<TResponse> TrySend<TResponse>(this IMediator @this, IRequest<TResponse> request,
-			CancellationToken cancellationToken = default) => async () => await @this.Send(request, cancellationToken);
-	}
-
 	public record DuplicatePlaylist(SpotifyClient Client, Playlist Playlist) : IRequest<Unit>;
 
 	public class DuplicatePlaylistRequestHandler : IRequestHandler<DuplicatePlaylist, Unit>
