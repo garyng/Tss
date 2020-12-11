@@ -255,8 +255,10 @@ namespace Tss.Core
 			result.Match(
 				current => _logger.Information("Cleaned playlist: {id} ({name})", current.Id, current.Name),
 				e => _logger.Error(e, "Error while cleaning playlist"));
+		}
 
-			TryAsync<string> GetTargetPlaylistId(string currentPlaylistId, Func<TssMappings.Mapping, string> select) =>
+		private TryAsync<string> GetTargetPlaylistId(string currentPlaylistId,
+			Func<TssMappings.Mapping, string> @select) =>
 				async () =>
 				{
 					var mappings = _mappings.CurrentValue;
@@ -264,9 +266,8 @@ namespace Tss.Core
 					var found = mappings.Mappings.TryGetValue(currentPlaylistId, out var target);
 					if (!found) target = mappings.Default;
 
-					return select(target!);
+				return @select(target!);
 				};
-		}
 
 		public async Task DuplicatePlaylist(string playlistId)
 		{
