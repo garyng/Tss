@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -12,8 +11,9 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using SpotifyAPI.Web;
 using MoreLinq;
+using Tss.Core.Models;
 using Tss.Core.Requests;
-using Unit = LanguageExt.Unit;
+using Void = GaryNg.Utils.Void.Void;
 
 namespace Tss.Core
 {
@@ -246,38 +246,31 @@ namespace Tss.Core
 		{
 			if (_client == null) return;
 
-			// var current = await Current();
-			var currentPlaylistId = playlistId;
-			var currentTracks = await GetTracks(currentPlaylistId);
+			var result = await (from current in Playlist.New(_client, playlistId)
+				from goodId in GetTargetPlaylistId(current.Id, m => m.Good)
+				from notGoodId in GetTargetPlaylistId(current.Id, m => m.NotGood)
+				from good in Playlist.New(_client, goodId)
+				from notGood in Playlist.New(_client, notGoodId)
+				let _ = _logger.Information("Cleaning {current} (good: {good}, not good: {notGood})", current.Id,
+					goodId, notGoodId)
+				from __ in _mediator.TrySend(new DuplicatePlaylist(_client, current))
+				from ___ in _mediator.TrySend(new CleanupPlaylist(_client, current, good, notGood))
+				select current).Try();
 
-			var good = GetTargetPlaylistId(currentPlaylistId, m => m.Good);
-			var goodTracks = await GetTracks(good);
+			result.Match(
+				current => _logger.Information("Cleaned playlist: {id} ({name})", current.Id, current.Name),
+				e => _logger.Error(e, "Error while cleaning playlist"));
 
-			var notGood = GetTargetPlaylistId(currentPlaylistId, m => m.NotGood);
-			var notGoodTracks = await GetTracks(notGood);
+			TryAsync<string> GetTargetPlaylistId(string currentPlaylistId, Func<TssMappings.Mapping, string> select) =>
+				async () =>
+				{
+					var mappings = _mappings.CurrentValue;
 
-			_logger.LogInformation("Cleaning {current} (good: {good}, not good: {notGood})", currentPlaylistId, good,
-				notGood);
+					var found = mappings.Mappings.TryGetValue(currentPlaylistId, out var target);
+					if (!found) target = mappings.Default;
 
-			await DuplicatePlaylist(currentPlaylistId);
-
-			var cleanTracks = currentTracks.Except(goodTracks)
-				.Except(notGoodTracks);
-
-			if (cleanTracks.SequenceEqual(currentTracks)) return;
-
-			await _client.Playlists.ReplaceItems(currentPlaylistId,
-				new PlaylistReplaceItemsRequest(new List<string>()));
-
-			await cleanTracks
-				.Batch(99)
-				.Select(ts => new PlaylistAddItemsRequest(ts.Select(t => t.Uri).ToList()))
-				.ToAsyncEnumerable()
-				.SelectAwait(async request => _client.Playlists.AddItems(currentPlaylistId, request))
-				.ToListAsync();
-
-			var removed = currentTracks.Count() - cleanTracks.Count();
-			_logger.LogInformation("Removed {count} tracks from {playlistId}", removed, currentPlaylistId);
+					return select(target!);
+				};
 		}
 
 		public async Task DuplicatePlaylist(string playlistId)
@@ -286,9 +279,12 @@ namespace Tss.Core
 
 			var result = await (from playlist in Playlist.New(_client, playlistId)
 				from _ in _mediator.TrySend(new DuplicatePlaylist(_client, playlist))
-				select Unit.Default).Try();
+				select playlist).Try();
 
-			result.IfFail(e => _logger.LogError(e, "Error while duplicating playlist: {playlist}", playlistId));
+			result.Match(
+				playlist => _logger.Information("Duplicated playlist: {id} ({name})", playlist.Id, playlist.Name),
+				e => _logger.Error(e, "Error while duplicating playlist: {id}", playlistId));
+		}
 		}
 	}
 }
