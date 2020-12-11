@@ -101,13 +101,14 @@ namespace Tss.Core
 			}
 		}
 
-		public async Task MoveCurrentToGood()
+
+		public async Task MoveCurrentToGood2()
 		{
 			await MoveCurrentTo2(m => m.Good, false);
 			_logger.LogInformation("Moved current to good");
 		}
 
-		public async Task MoveCurrentToNotGood()
+		public async Task MoveCurrentToNotGood2()
 		{
 			await MoveCurrentTo2(m => m.NotGood);
 			_logger.LogInformation("Moved current to not good");
@@ -230,11 +231,15 @@ namespace Tss.Core
 				.ToListAsync();
 		}
 
+
 		public async Task CleanupCurrentPlaylist()
 		{
 			if (_client == null) return;
 			var result = await (from current in Current.New(_client)
 				select CleanupPlaylist(current.Playlist.Id)).Try();
+
+			result.Match(_ => _logger.Information("Cleaned current playlist"),
+				e => _logger.Error(e, "Unable to clean current playlist"));
 		}
 
 		public async Task CleanupPlaylist(string playlistId)
@@ -259,15 +264,15 @@ namespace Tss.Core
 
 		private TryAsync<string> GetTargetPlaylistId(string currentPlaylistId,
 			Func<TssMappings.Mapping, string> @select) =>
-				async () =>
-				{
-					var mappings = _mappings.CurrentValue;
+			async () =>
+			{
+				var mappings = _mappings.CurrentValue;
 
-					var found = mappings.Mappings.TryGetValue(currentPlaylistId, out var target);
-					if (!found) target = mappings.Default;
+				var found = mappings.Mappings.TryGetValue(currentPlaylistId, out var target);
+				if (!found) target = mappings.Default;
 
 				return @select(target!);
-				};
+			};
 
 		public async Task DuplicatePlaylist(string playlistId)
 		{
@@ -282,26 +287,45 @@ namespace Tss.Core
 				e => _logger.Error(e, "Error while duplicating playlist: {id}", playlistId));
 		}
 
-		public async Task MoveTrack()
+		public async Task MoveTrack(Track track, Playlist source, Playlist target, bool skip)
 		{
 			if (_client == null) return;
 
-			var result = await (from current in Current.Empty(_client)
-				from targetId in GetTargetPlaylistId(current.Playlist.Id, m => m.Good)
-				from target in Playlist.Empty(_client, targetId)
-				from _ in _mediator.TrySend(new MoveTrack(_client, current.Track, current.Playlist, target))
+			var result = await (from _ in _mediator.TrySend(new MoveTrack(_client, track, source, target, skip))
 				let __ = _logger.Information(
 					"Moved \"{trackName}\" ({trackId}) from \"{sourceName}\" ({sourceId}) to \"{targetName}\" ({targetId})",
-					current.Track.Name, current.Track.Uri,
-					current.Playlist.Name, current.Playlist.Id, target.Name, target.Id)
-				select current).Try();
+					track.Name, track.Uri,
+					source.Name, source.Id, target.Name, target.Id)
+				select Void.Default).Try();
 
 			result.IfFail(e => _logger.Error(e, "Error while moving track"));
 		}
 
+		public async Task MoveCurrentTrackToNotGood()
+		{
+			if (_client == null) return;
+			await MoveCurrentTrackTo(m => m.NotGood, true);
+		}
+
+		public async Task MoveCurrentTrackToGood()
+		{
+			if (_client == null) return;
+			await MoveCurrentTrackTo(m => m.Good, false);
+		}
+
+		public async Task MoveCurrentTrackTo(Func<TssMappings.Mapping, string> getPlaylistId, bool skip)
+		{
+			if (_client == null) return;
+			await (from current in Current.Empty(_client)
+				from targetId in GetTargetPlaylistId(current.Playlist.Id, getPlaylistId)
+				from target in Playlist.Empty(_client, targetId)
+				select MoveTrack(current.Track, current.Playlist, target, skip)).Try();
+		}
+
 		public async Task Testing()
 		{
-			await MoveTrack();
+			await MoveCurrentTrackToGood();
+			await MoveCurrentTrackToNotGood();
 		}
 	}
 }

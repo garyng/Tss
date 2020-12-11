@@ -10,7 +10,7 @@ using Void = GaryNg.Utils.Void.Void;
 namespace Tss.Core.Requests
 {
 	public record MoveTrack
-		(ISpotifyClient Client, Track Track, Playlist Source, Playlist Target, bool Skip = false) : IRequest<Void>;
+		(ISpotifyClient Client, Track Track, Playlist Source, Playlist Target, bool Skip) : IRequest<Void>;
 
 	public class MoveTrackRequestHandler : IRequestHandler<MoveTrack, Void>
 	{
