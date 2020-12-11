@@ -15,13 +15,6 @@ namespace Tss.Core.Requests
 
 	public class DuplicatePlaylistRequestHandler : IRequestHandler<DuplicatePlaylist, Void>
 	{
-		private readonly ILogger<DuplicatePlaylistRequestHandler> _logger;
-
-		public DuplicatePlaylistRequestHandler(ILogger<DuplicatePlaylistRequestHandler> logger)
-		{
-			_logger = logger;
-		}
-
 		public async Task<Void> Handle(DuplicatePlaylist request, CancellationToken cancellationToken)
 		{
 			var (client, playlist) = request;
@@ -42,7 +35,7 @@ namespace Tss.Core.Requests
 				.ToAsyncEnumerable()
 				.SelectAwait(async r => await client.Playlists.AddItems(backup.Id, r))
 				.ToListAsync(cancellationToken);
-
+			
 			return Void.Value;
 		}
 	}
