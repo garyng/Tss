@@ -7,13 +7,13 @@ using Microsoft.Extensions.Logging;
 using MoreLinq;
 using SpotifyAPI.Web;
 using Tss.Core.Models;
-using Unit = MediatR.Unit;
+using Void = GaryNg.Utils.Void.Void;
 
 namespace Tss.Core.Requests
 {
-	public record DuplicatePlaylist(SpotifyClient Client, Playlist Playlist) : IRequest<Unit>;
+	public record DuplicatePlaylist(SpotifyClient Client, Playlist Playlist) : IRequest<Void>;
 
-	public class DuplicatePlaylistRequestHandler : IRequestHandler<DuplicatePlaylist, Unit>
+	public class DuplicatePlaylistRequestHandler : IRequestHandler<DuplicatePlaylist, Void>
 	{
 		private readonly ILogger<DuplicatePlaylistRequestHandler> _logger;
 
@@ -22,7 +22,7 @@ namespace Tss.Core.Requests
 			_logger = logger;
 		}
 
-		public async Task<Unit> Handle(DuplicatePlaylist request, CancellationToken cancellationToken)
+		public async Task<Void> Handle(DuplicatePlaylist request, CancellationToken cancellationToken)
 		{
 			var (client, playlist) = request;
 			var userId = (await client.UserProfile.Current()).Id;
@@ -43,7 +43,7 @@ namespace Tss.Core.Requests
 				.SelectAwait(async r => await client.Playlists.AddItems(backup.Id, r))
 				.ToListAsync(cancellationToken);
 
-			return Unit.Value;
+			return Void.Value;
 		}
 	}
 }
