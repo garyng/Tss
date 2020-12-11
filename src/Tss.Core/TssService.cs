@@ -161,15 +161,15 @@ namespace Tss.Core
 		public async Task MoveCurrentToNotGood()
 		{
 			if (_client == null) return;
+			_logger.Information("Move current to not good");
 			await MoveCurrentTo(m => m.NotGood, true);
-			_logger.Information("Moved current to not good");
 		}
 
 		public async Task MoveCurrentToGood()
 		{
 			if (_client == null) return;
+			_logger.Information("Move current to good");
 			await MoveCurrentTo(m => m.Good, false);
-			_logger.Information("Moved current to good");
 		}
 
 		public async Task MoveCurrentTo(Func<TssMappings.Mapping, string> getPlaylistId, bool skip)
