@@ -27,5 +27,11 @@
             </summary>
             <returns></returns>
         </member>
+        <member name="M:Tss.Api.Controllers.TssController.CleanupCurrentPlaylist">
+            <summary>
+            Cleanup the currently playing playlist.
+            </summary>
+            <returns></returns>
+        </member>
     </members>
 </doc>
