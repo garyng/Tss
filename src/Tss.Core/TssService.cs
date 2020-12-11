@@ -5,68 +5,29 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using LanguageExt;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using SpotifyAPI.Web;
 using MoreLinq;
+using Tss.Core.Requests;
+using Unit = LanguageExt.Unit;
 
 namespace Tss.Core
 {
-	public class Track : IEquatable<Track>
+	public record Track
 	{
-		public bool Equals(Track? other)
+		public string Uri { get; init; }
+		public string Name { get; init; }
+
+		public Track([NotNull] IPlayableItem item) => (Uri, Name) = item switch
 		{
-			if (ReferenceEquals(null, other)) return false;
-			if (ReferenceEquals(this, other)) return true;
-			return Uri == other.Uri;
-		}
-
-		public override bool Equals(object? obj)
-		{
-			if (ReferenceEquals(null, obj)) return false;
-			if (ReferenceEquals(this, obj)) return true;
-			if (obj.GetType() != this.GetType()) return false;
-			return Equals((Track) obj);
-		}
-
-		public override int GetHashCode()
-		{
-			return Uri.GetHashCode();
-		}
-
-		public static bool operator ==(Track? left, Track? right)
-		{
-			return Equals(left, right);
-		}
-
-		public static bool operator !=(Track? left, Track? right)
-		{
-			return !Equals(left, right);
-		}
-
-		[NotNull]
-		public string Uri { get; set; }
-
-		[NotNull]
-		public string Name { get; set; }
-
-		public Track([NotNull] IPlayableItem item)
-		{
-			(Uri, Name) = item switch
-			{
-				FullTrack track => (track.Uri, track.Name),
-				FullEpisode episode => (episode.Uri, episode.Name),
-			};
-		}
-
-		public void Deconstruct(out string uri, out string name)
-		{
-			uri = Uri;
-			name = Name;
-		}
+			FullTrack track => (track.Uri, track.Name),
+			FullEpisode episode => (episode.Uri, episode.Name),
+		};
 	}
-
 
 	public class TssService
 	{
@@ -283,11 +244,7 @@ namespace Tss.Core
 
 		public async Task CleanupPlaylist(string playlistId)
 		{
-			// backup playlist
-			// remove good and not good tracks from current playlist
-
 			if (_client == null) return;
-
 
 			// var current = await Current();
 			var currentPlaylistId = playlistId;
@@ -299,6 +256,9 @@ namespace Tss.Core
 			var notGood = GetTargetPlaylistId(currentPlaylistId, m => m.NotGood);
 			var notGoodTracks = await GetTracks(notGood);
 
+			_logger.LogInformation("Cleaning {current} (good: {good}, not good: {notGood})", currentPlaylistId, good,
+				notGood);
+
 			await DuplicatePlaylist(currentPlaylistId);
 
 			var cleanTracks = currentTracks.Except(goodTracks)
@@ -306,7 +266,8 @@ namespace Tss.Core
 
 			if (cleanTracks.SequenceEqual(currentTracks)) return;
 
-			await _client.Playlists.ReplaceItems(currentPlaylistId, new PlaylistReplaceItemsRequest(new List<string>()));
+			await _client.Playlists.ReplaceItems(currentPlaylistId,
+				new PlaylistReplaceItemsRequest(new List<string>()));
 
 			await cleanTracks
 				.Batch(99)
@@ -314,30 +275,20 @@ namespace Tss.Core
 				.ToAsyncEnumerable()
 				.SelectAwait(async request => _client.Playlists.AddItems(currentPlaylistId, request))
 				.ToListAsync();
+
+			var removed = currentTracks.Count() - cleanTracks.Count();
+			_logger.LogInformation("Removed {count} tracks from {playlistId}", removed, currentPlaylistId);
 		}
 
 		public async Task DuplicatePlaylist(string playlistId)
 		{
 			if (_client == null) return;
 
+			var result = await (from playlist in Playlist.New(_client, playlistId)
+				from _ in _mediator.TrySend(new DuplicatePlaylist(_client, playlist))
+				select Unit.Default).Try();
 
-			var playlist = await _client.Playlists.Get(playlistId);
-
-			var page = playlist.Tracks;
-
-			var name = $"{playlist.Name} ({DateTime.Now:yyyyMMdd-HHmmss})";
-
-			var backup = await _client.Playlists.Create(playlist.Owner.Id, new PlaylistCreateRequest(name));
-
-			var batches = await GetTrackBatches(page);
-
-			await batches
-				.Select(uris => new PlaylistAddItemsRequest(uris
-					.Select(t => t.Uri)
-					.ToList()))
-				.ToAsyncEnumerable()
-				.SelectAwait(async request => await _client.Playlists.AddItems(backup.Id, request))
-				.ToListAsync();
+			result.IfFail(e => _logger.LogError(e, "Error while duplicating playlist: {playlist}", playlistId));
 		}
 	}
 }
