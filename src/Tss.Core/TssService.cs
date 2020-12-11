@@ -17,18 +17,6 @@ using Void = GaryNg.Utils.Void.Void;
 
 namespace Tss.Core
 {
-	public record Track
-	{
-		public string Uri { get; init; }
-		public string Name { get; init; }
-
-		public Track([NotNull] IPlayableItem item) => (Uri, Name) = item switch
-		{
-			FullTrack track => (track.Uri, track.Name),
-			FullEpisode episode => (episode.Uri, episode.Name),
-		};
-	}
-
 	public class TssService
 	{
 		protected string _clientId;
@@ -238,7 +226,7 @@ namespace Tss.Core
 		private async Task<IEnumerable<Track>> GetTracks(Paging<PlaylistTrack<IPlayableItem>> page)
 		{
 			return await _client.Paginate(page)
-				.Select(item => new Track(item.Track))
+				.Select(item => Track.New(item.Track))
 				.ToListAsync();
 		}
 
