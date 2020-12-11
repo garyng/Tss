@@ -281,6 +281,27 @@ namespace Tss.Core
 				playlist => _logger.Information("Duplicated playlist: {id} ({name})", playlist.Id, playlist.Name),
 				e => _logger.Error(e, "Error while duplicating playlist: {id}", playlistId));
 		}
+
+		public async Task MoveTrack()
+		{
+			if (_client == null) return;
+
+			var result = await (from current in Current.Empty(_client)
+				from targetId in GetTargetPlaylistId(current.Playlist.Id, m => m.Good)
+				from target in Playlist.Empty(_client, targetId)
+				from _ in _mediator.TrySend(new MoveTrack(_client, current.Track, current.Playlist, target))
+				let __ = _logger.Information(
+					"Moved \"{trackName}\" ({trackId}) from \"{sourceName}\" ({sourceId}) to \"{targetName}\" ({targetId})",
+					current.Track.Name, current.Track.Uri,
+					current.Playlist.Name, current.Playlist.Id, target.Name, target.Id)
+				select current).Try();
+
+			result.IfFail(e => _logger.Error(e, "Error while moving track"));
+		}
+
+		public async Task Testing()
+		{
+			await MoveTrack();
 		}
 	}
 }
