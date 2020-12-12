@@ -66,10 +66,10 @@ namespace Tss.Core
 			var result = await (
 				from client in _client.ToTryAsync()
 				from current in Current.New(client)
-				let _ = _logger.Information("Cleaned current playlist")
 				select CleanupPlaylist(current.Playlist.Id)).Try();
 
-			result.IfFail(e => _logger.Error(e, "Unable to clean current playlist"));
+			result.Match(_ => _logger.Information("Cleaned current playlist"),
+				e => _logger.Error(e, "Unable to clean current playlist"));
 		}
 
 		public async Task CleanupPlaylist(string playlistId)
