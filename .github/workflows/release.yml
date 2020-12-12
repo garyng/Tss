@@ -32,8 +32,6 @@ jobs:
       - name: Versioning
         id: gitversion
         uses: gittools/actions/gitversion/execute@v0.9.7
-        with:
-          additionalArguments: "/updateassemblyinfo /ensureassemblyinfo"
 
       - name: Build and push
         uses: docker/build-push-action@v2
