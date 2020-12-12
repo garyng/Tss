@@ -31,4 +31,10 @@
     <ProjectReference Include="..\Tss.Core\Tss.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Tss.Api.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
