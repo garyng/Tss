@@ -29,6 +29,12 @@ namespace Tss.Core
 			_logger = logger;
 			_mediator = mediator;
 			_config = config.Value;
+			PrintVersion();
+		}
+
+		private void PrintVersion()
+		{
+			_logger.LogInformation("Version: {version}", this.GetType().Assembly.GetName().Version);
 		}
 
 		public async Task<Option<string>> TryLogin()
