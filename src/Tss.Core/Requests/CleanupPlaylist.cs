@@ -12,7 +12,7 @@ using Tss.Core.Models;
 namespace Tss.Core.Requests
 {
 	public record CleanupPlaylist
-		(SpotifyClient Client, Playlist Current, Playlist Good, Playlist NotGood) : IRequest<Void>;
+		(ISpotifyClient Client, Playlist Current, Playlist Good, Playlist NotGood) : IRequest<Void>;
 
 	public class CleanupPlaylistRequestHandler : IRequestHandler<CleanupPlaylist, Void>
 	{

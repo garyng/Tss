@@ -11,7 +11,7 @@ using Void = GaryNg.Utils.Void.Void;
 
 namespace Tss.Core.Requests
 {
-	public record DuplicatePlaylist(SpotifyClient Client, Playlist Playlist) : IRequest<Void>;
+	public record DuplicatePlaylist(ISpotifyClient Client, Playlist Playlist) : IRequest<Void>;
 
 	public class DuplicatePlaylistRequestHandler : IRequestHandler<DuplicatePlaylist, Void>
 	{
