@@ -44,6 +44,7 @@ namespace Tss.Core.Requests
 				.Batch(99)
 				.Select(ts => new PlaylistAddItemsRequest(ts.Select(t => t.Uri).ToList()))
 				.ToAsyncEnumerable()
+				// todo: this might fail on large playlist, probably should use polly?
 				.SelectAwait(async request => client.Playlists.AddItems(current.Id, request))
 				.ToListAsync();
 
