@@ -31,7 +31,11 @@ namespace Tss.Core.Requests
 				.Except(notGood.Tracks)
 				.ToList();
 
-			if (cleanTracks.SequenceEqual(current.Tracks)) return Void.Default;
+			if (cleanTracks.SequenceEqual(current.Tracks))
+			{
+				_logger.LogInformation("Nothing to remove from {playlist})", current);
+				return Void.Default;
+			}
 
 			// clear playlist
 			await client.Playlists.ReplaceItems(current.Id, new PlaylistReplaceItemsRequest(new List<string>()));
