@@ -1,16 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using LanguageExt;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using SpotifyAPI.Web;
-using MoreLinq;
+using Tss.Core.Extensions;
 using Tss.Core.Models;
 using Tss.Core.Requests;
 using Void = GaryNg.Utils.Void.Void;
@@ -19,16 +14,13 @@ namespace Tss.Core
 {
 	public class TssService
 	{
-		protected string _clientId;
-		protected string _credentialsPath;
-		protected string _callbackUrl;
-		protected int _callbackPort;
+		protected Option<ISpotifyClient> _client;
+		protected Option<TssLoginFlow> _loginFlow;
 
-		protected TssLoginFlow _loginFlow;
-		protected SpotifyClient? _client;
 		private IOptionsMonitor<TssMappings> _mappings;
 		private readonly ILogger<TssService> _logger;
 		private readonly IMediator _mediator;
+		protected TssConfig _config;
 
 		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings, ILogger<TssService> logger,
 			IMediator mediator)
@@ -36,101 +28,68 @@ namespace Tss.Core
 			_mappings = mappings;
 			_logger = logger;
 			_mediator = mediator;
-			var c = config.Value;
-			_clientId = c.ClientId;
-			_credentialsPath = c.CredentialsPath;
-			_callbackUrl = $"http://localhost:{c.CallbackPort}/callback";
-			_callbackPort = c.CallbackPort;
+			_config = config.Value;
 		}
 
-		public async Task<TryLoginResult> TryLogin()
+		public async Task<Option<string>> TryLogin()
 		{
-			if (File.Exists(_credentialsPath))
+			return await (await _mediator.Send(new TryLogin()))
+				.MatchAsync(
+					CreateClient,
+					StartFlow);
+
+			async Task<Option<string>> StartFlow(TssLoginFlow flow)
 			{
-				var token = await LoadToken();
-				_logger.LogInformation("Loaded token from '{filename}'", _credentialsPath);
-				await CreateClient(token);
-				return new TryLoginResult(true, null);
+				_loginFlow = flow;
+				return await flow.Start();
 			}
 
-			_loginFlow = new TssLoginFlow(_clientId, _callbackUrl);
-			var url = await _loginFlow.Start();
-			_logger.LogInformation("Started authentication flow");
-			return new TryLoginResult(false, url);
+			async Task<Option<string>> CreateClient(PKCETokenResponse token)
+			{
+				_client = Prelude.Some(await _mediator.Send(new CreateClient(token)));
+				return default;
+			}
 		}
 
 		public async Task CompleteLogin(string code)
 		{
-			var token = await _loginFlow!.Complete(code);
-			_logger.LogInformation("Completed authentication flow");
-			await CreateClient(token);
-		}
-
-		public async Task CreateClient(PKCETokenResponse token)
-		{
-			var authenticator = new PKCEAuthenticator(_clientId, token);
-			authenticator.TokenRefreshed += async (_, t) => await SaveToken(t);
-
-			var config = SpotifyClientConfig.CreateDefault()
-				.WithAuthenticator(authenticator);
-
-			await SaveToken(token);
-			_client = new SpotifyClient(config);
-		}
-
-		private async Task<PKCETokenResponse> LoadToken()
-		{
-			var json = await File.ReadAllTextAsync(_credentialsPath);
-			return JsonConvert.DeserializeObject<PKCETokenResponse>(json);
-		}
-
-		private async Task SaveToken(PKCETokenResponse token)
-		{
-			EnsureDirectoryExist(_credentialsPath);
-			var json = JsonConvert.SerializeObject(token);
-			await File.WriteAllTextAsync(_credentialsPath, json);
-			_logger.LogInformation("Token saved to '{filename}'", _credentialsPath);
-		}
-
-		private void EnsureDirectoryExist(string path)
-		{
-			var dir = Path.GetDirectoryName(path);
-			if (!Directory.Exists(dir))
+			await _loginFlow.Match(async flow =>
 			{
-				Directory.CreateDirectory(dir);
-			}
+				var token = await flow.Complete(code);
+				_logger.LogInformation("Completed authentication flow");
+				_client = Prelude.Some(await _mediator.Send(new CreateClient(token)));
+			}, async () => _logger.Error("Unable to complete login flow"));
 		}
-
 
 		public async Task CleanupCurrentPlaylist()
 		{
-			if (_client == null) return;
-			var result = await (from current in Current.New(_client)
+			var result = await (
+				from client in _client.ToTryAsync()
+				from current in Current.New(client)
+				let _ = _logger.Information("Cleaned current playlist")
 				select CleanupPlaylist(current.Playlist.Id)).Try();
 
-			result.Match(_ => _logger.Information("Cleaned current playlist"),
-				e => _logger.Error(e, "Unable to clean current playlist"));
+			result.IfFail(e => _logger.Error(e, "Unable to clean current playlist"));
 		}
 
 		public async Task CleanupPlaylist(string playlistId)
 		{
-			if (_client == null) return;
-
-			var result = await (from current in Playlist.New(_client, playlistId)
+			var result = await (
+				from client in _client.ToTryAsync()
+				from current in Playlist.New(client, playlistId)
 				from goodId in GetTargetPlaylistId(current.Id, m => m.Good)
 				from notGoodId in GetTargetPlaylistId(current.Id, m => m.NotGood)
-				from good in Playlist.New(_client, goodId)
-				from notGood in Playlist.New(_client, notGoodId)
+				from good in Playlist.New(client, goodId)
+				from notGood in Playlist.New(client, notGoodId)
 				let _ = _logger.Information("Cleaning {current} (good: {good}, not good: {notGood})", current, good,
 					notGood)
-				from __ in _mediator.TrySend(new DuplicatePlaylist(_client, current))
+				from __ in _mediator.TrySend(new DuplicatePlaylist(client, current))
 				let ___ = _logger.Information("Duplicated playlist: {playlist}", current)
-				from ____ in _mediator.TrySend(new CleanupPlaylist(_client, current, good, notGood))
+				from ____ in _mediator.TrySend(new CleanupPlaylist(client, current, good, notGood))
+				let _____ = _logger.Information("Cleaned playlist: {playlist}", current)
 				select current).Try();
 
-			result.Match(
-				current => _logger.Information("Cleaned playlist: {playlist}", current),
-				e => _logger.Error(e, "Error while cleaning playlist"));
+			result.IfFail(e => _logger.Error(e, "Error while cleaning playlist"));
 		}
 
 		private TryAsync<string> GetTargetPlaylistId(string currentPlaylistId,
@@ -148,9 +107,9 @@ namespace Tss.Core
 
 		public async Task MoveTrack(Track track, Playlist source, Playlist target, bool skip)
 		{
-			if (_client == null) return;
-
-			var result = await (from _ in _mediator.TrySend(new MoveTrack(_client, track, source, target, skip))
+			var result = await (
+				from client in _client.ToTryAsync()
+				from _ in _mediator.TrySend(new MoveTrack(client, track, source, target, skip))
 				let __ = _logger.Information(
 					"Moved {track} from {source} to {target}", track, source, target)
 				select Void.Default).Try();
@@ -160,33 +119,26 @@ namespace Tss.Core
 
 		public async Task MoveCurrentToNotGood()
 		{
-			if (_client == null) return;
 			_logger.Information("Move current to not good");
 			await MoveCurrentTo(m => m.NotGood, true);
 		}
 
 		public async Task MoveCurrentToGood()
 		{
-			if (_client == null) return;
 			_logger.Information("Move current to good");
 			await MoveCurrentTo(m => m.Good, false);
 		}
 
 		public async Task MoveCurrentTo(Func<TssMappings.Mapping, string> getPlaylistId, bool skip)
 		{
-			if (_client == null) return;
-			var result = await (from current in Current.Empty(_client)
+			var result = await (
+				from client in _client.ToTryAsync()
+				from current in Current.Empty(client)
 				from targetId in GetTargetPlaylistId(current.Playlist.Id, getPlaylistId)
-				from target in Playlist.Empty(_client, targetId)
+				from target in Playlist.Empty(client, targetId)
 				select MoveTrack(current.Track, current.Playlist, target, skip)).Try();
 
 			result.IfFail(e => _logger.Error(e, "Error while moving current track"));
-		}
-
-		public async Task Testing()
-		{
-			// await CleanupCurrentPlaylist();
-			await MoveCurrentToNotGood();
 		}
 	}
 }
