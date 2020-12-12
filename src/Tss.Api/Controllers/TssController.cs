@@ -23,7 +23,10 @@ namespace Tss.Api.Controllers
 		[HttpGet]
 		public async Task<TryLoginResult> TryLogin()
 		{
-			return await _service.TryLogin();
+			return await _service.TryLogin()
+				.BiMapAsync(
+					url => new TryLoginResult(false, url),
+					_ => new TryLoginResult(true, null));
 		}
 
 		/// <summary>
@@ -61,6 +64,16 @@ namespace Tss.Api.Controllers
 		public async Task MoveCurrentToNotGood()
 		{
 			await _service.MoveCurrentToNotGood();
+		}
+
+		/// <summary>
+		/// Cleanup the currently playing playlist.
+		/// </summary>
+		/// <returns></returns>
+		[HttpGet]
+		public async Task CleanupCurrentPlaylist()
+		{
+			await _service.CleanupCurrentPlaylist();
 		}
 	}
 }

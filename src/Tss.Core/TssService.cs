@@ -1,197 +1,144 @@
 ﻿using System;
-using System.IO;
-using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using LanguageExt;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using SpotifyAPI.Web;
+using Tss.Core.Extensions;
+using Tss.Core.Models;
+using Tss.Core.Requests;
+using Void = GaryNg.Utils.Void.Void;
 
 namespace Tss.Core
 {
 	public class TssService
 	{
-		protected string _clientId;
-		protected string _credentialsPath;
-		protected string _callbackUrl;
-		protected int _callbackPort;
+		protected Option<ISpotifyClient> _client;
+		protected Option<TssLoginFlow> _loginFlow;
 
-		protected TssLoginFlow _loginFlow;
-		protected SpotifyClient? _client;
 		private IOptionsMonitor<TssMappings> _mappings;
 		private readonly ILogger<TssService> _logger;
+		private readonly IMediator _mediator;
+		protected TssConfig _config;
 
-		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings, ILogger<TssService> logger)
+		public TssService(IOptions<TssConfig> config, IOptionsMonitor<TssMappings> mappings, ILogger<TssService> logger,
+			IMediator mediator)
 		{
 			_mappings = mappings;
 			_logger = logger;
-			var c = config.Value;
-			_clientId = c.ClientId;
-			_credentialsPath = c.CredentialsPath;
-			_callbackUrl = $"http://localhost:{c.CallbackPort}/callback";
-			_callbackPort = c.CallbackPort;
+			_mediator = mediator;
+			_config = config.Value;
 		}
 
-		public async Task<TryLoginResult> TryLogin()
+		public async Task<Option<string>> TryLogin()
 		{
-			if (File.Exists(_credentialsPath))
+			return await (await _mediator.Send(new TryLogin()))
+				.MatchAsync(
+					CreateClient,
+					StartFlow);
+
+			async Task<Option<string>> StartFlow(TssLoginFlow flow)
 			{
-				var token = await LoadToken();
-				_logger.LogInformation("Loaded token from '{filename}'", _credentialsPath);
-				await CreateClient(token);
-				return new TryLoginResult(true, null);
+				_loginFlow = flow;
+				return await flow.Start();
 			}
 
-			_loginFlow = new TssLoginFlow(_clientId, _callbackUrl);
-			var url = await _loginFlow.Start();
-			_logger.LogInformation("Started authentication flow");
-			return new TryLoginResult(false, url);
+			async Task<Option<string>> CreateClient(PKCETokenResponse token)
+			{
+				_client = Prelude.Some(await _mediator.Send(new CreateClient(token)));
+				return default;
+			}
 		}
 
 		public async Task CompleteLogin(string code)
 		{
-			var token = await _loginFlow!.Complete(code);
-			_logger.LogInformation("Completed authentication flow");
-			await CreateClient(token);
-		}
-
-		public async Task CreateClient(PKCETokenResponse token)
-		{
-			var authenticator = new PKCEAuthenticator(_clientId, token);
-			authenticator.TokenRefreshed += async (_, t) => await SaveToken(t);
-
-			var config = SpotifyClientConfig.CreateDefault()
-				.WithAuthenticator(authenticator);
-
-			await SaveToken(token);
-			_client = new SpotifyClient(config);
-		}
-
-		private async Task<PKCETokenResponse> LoadToken()
-		{
-			var json = await File.ReadAllTextAsync(_credentialsPath);
-			return JsonConvert.DeserializeObject<PKCETokenResponse>(json);
-		}
-
-		private async Task SaveToken(PKCETokenResponse token)
-		{
-			EnsureDirectoryExist(_credentialsPath);
-			var json = JsonConvert.SerializeObject(token);
-			await File.WriteAllTextAsync(_credentialsPath, json);
-			_logger.LogInformation("Token saved to '{filename}'", _credentialsPath);
-		}
-
-		private void EnsureDirectoryExist(string path)
-		{
-			var dir = Path.GetDirectoryName(path);
-			if (!Directory.Exists(dir))
+			await _loginFlow.Match(async flow =>
 			{
-				Directory.CreateDirectory(dir);
-			}
+				var token = await flow.Complete(code);
+				_logger.LogInformation("Completed authentication flow");
+				_client = Prelude.Some(await _mediator.Send(new CreateClient(token)));
+			}, async () => _logger.Error("Unable to complete login flow"));
 		}
 
-		public async Task MoveCurrentToGood()
+		public async Task CleanupCurrentPlaylist()
 		{
-			await MoveCurrentTo(m => m.Good, false);
-			_logger.LogInformation("Moved current to good");
+			var result = await (
+				from client in _client.ToTryAsync()
+				from current in Current.New(client)
+				let _ = _logger.Information("Cleaned current playlist")
+				select CleanupPlaylist(current.Playlist.Id)).Try();
+
+			result.IfFail(e => _logger.Error(e, "Unable to clean current playlist"));
+		}
+
+		public async Task CleanupPlaylist(string playlistId)
+		{
+			var result = await (
+				from client in _client.ToTryAsync()
+				from current in Playlist.New(client, playlistId)
+				from goodId in GetTargetPlaylistId(current.Id, m => m.Good)
+				from notGoodId in GetTargetPlaylistId(current.Id, m => m.NotGood)
+				from good in Playlist.New(client, goodId)
+				from notGood in Playlist.New(client, notGoodId)
+				let _ = _logger.Information("Cleaning {current} (good: {good}, not good: {notGood})", current, good,
+					notGood)
+				from __ in _mediator.TrySend(new DuplicatePlaylist(client, current))
+				let ___ = _logger.Information("Duplicated playlist: {playlist}", current)
+				from ____ in _mediator.TrySend(new CleanupPlaylist(client, current, good, notGood))
+				let _____ = _logger.Information("Cleaned playlist: {playlist}", current)
+				select current).Try();
+
+			result.IfFail(e => _logger.Error(e, "Error while cleaning playlist"));
+		}
+
+		private TryAsync<string> GetTargetPlaylistId(string currentPlaylistId,
+			Func<TssMappings.Mapping, string> @select) =>
+			async () =>
+			{
+				var mappings = _mappings.CurrentValue;
+
+				var found = mappings.Mappings.TryGetValue(currentPlaylistId, out var target);
+				if (!found) target = mappings.Default;
+
+				return @select(target!);
+			};
+
+
+		public async Task MoveTrack(Track track, Playlist source, Playlist target, bool skip)
+		{
+			var result = await (
+				from client in _client.ToTryAsync()
+				from _ in _mediator.TrySend(new MoveTrack(client, track, source, target, skip))
+				let __ = _logger.Information(
+					"Moved {track} from {source} to {target}", track, source, target)
+				select Void.Default).Try();
+
+			result.IfFail(e => _logger.Error(e, "Error while moving track"));
 		}
 
 		public async Task MoveCurrentToNotGood()
 		{
-			await MoveCurrentTo(m => m.NotGood);
-			_logger.LogInformation("Moved current to not good");
+			_logger.Information("Move current to not good");
+			await MoveCurrentTo(m => m.NotGood, true);
 		}
 
-		public async Task MoveCurrentTo(Func<TssMappings.Mapping, string> getPlaylistId, bool skip = true)
+		public async Task MoveCurrentToGood()
 		{
-			if (_client == null) return;
-
-			// todo: return track name, playlist name (source and target)?
-
-			var current = await Current();
-
-			var targetPlaylistId = GetTargetPlaylistId(current.playlistId, getPlaylistId);
-
-			if (!current.track.HasValue) return;
-
-			var (name, trackUri) = current.track.Value;
-
-			await TryRemoveFromPlaylist(current.playlistId, trackUri);
-			await AddToPlaylist(targetPlaylistId, trackUri);
-
-			if (skip)
-			{
-				await _client.Player.SkipNext();
-			}
+			_logger.Information("Move current to good");
+			await MoveCurrentTo(m => m.Good, false);
 		}
 
-
-		private string GetTargetPlaylistId(string? currentPlaylistId, Func<TssMappings.Mapping, string> select)
+		public async Task MoveCurrentTo(Func<TssMappings.Mapping, string> getPlaylistId, bool skip)
 		{
-			var mappings = _mappings.CurrentValue;
+			var result = await (
+				from client in _client.ToTryAsync()
+				from current in Current.Empty(client)
+				from targetId in GetTargetPlaylistId(current.Playlist.Id, getPlaylistId)
+				from target in Playlist.Empty(client, targetId)
+				select MoveTrack(current.Track, current.Playlist, target, skip)).Try();
 
-			if (currentPlaylistId == null) return select(mappings.Default);
-
-			var found = mappings.Mappings.TryGetValue(currentPlaylistId, out var target);
-			if (!found) target = mappings.Default;
-
-			return select(target!);
-		}
-
-		private async Task TryRemoveFromPlaylist(string? playlistId, string trackUri)
-		{
-			if (_client == null) return;
-			if (string.IsNullOrEmpty(playlistId)) return;
-
-			try
-			{
-				_logger.LogInformation("Try remove {trackUri} from {playlistId}", trackUri, playlistId);
-				await _client.Playlists.RemoveItems(playlistId, new PlaylistRemoveItemsRequest
-				{
-					Tracks = new[] {new SpotifyAPI.Web.PlaylistRemoveItemsRequest.Item() {Uri = trackUri}}
-				});
-			}
-			catch (Exception e)
-			{
-				_logger.LogError(e, "Error removing {trackUri} from {playlistId}", trackUri, playlistId);
-			}
-		}
-
-		private async Task AddToPlaylist(string playlistId, string trackUri)
-		{
-			if (_client == null) return;
-			_logger.LogInformation("Add {trackUri} to {playlistId}", trackUri, playlistId);
-			await _client.Playlists.AddItems(playlistId, new PlaylistAddItemsRequest(new[] {trackUri}));
-		}
-
-
-		private async Task<((string name, string trackUri)? track, string? playlistId)> Current()
-		{
-			if (_client == null) return (null, null);
-
-			var current = await _client.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest());
-			var currentPlaylistId = Regex.Match(current?.Context.Uri ?? "", "playlist:(?<id>.*)").Groups["id"].Value;
-
-			((string name, string uri)? track, string playlistId) result = current?.Item switch
-			{
-				FullTrack track => ((track.Name, track.Uri), currentPlaylistId),
-				FullEpisode episode => ((episode.Name, episode.Uri), currentPlaylistId),
-				_ => (null, null)
-			};
-			_logger.LogInformation("[Current] track: {trackName} ({trackUri}) playlist: {playlistId}",
-				result.track?.name, result.track?.uri, result.playlistId);
-			return result;
-		}
-
-		private async Task<((string name, string trackUri)? track, string? playlistId)> Previous()
-		{
-			var previousTrack = (await _client.Player.GetRecentlyPlayed(new PlayerRecentlyPlayedRequest
-			{
-				Limit = 1
-			}))?.Items?.FirstOrDefault();
-
-			throw new NotImplementedException("Recently played is not recent enough.");
+			result.IfFail(e => _logger.Error(e, "Error while moving current track"));
 		}
 	}
 }
