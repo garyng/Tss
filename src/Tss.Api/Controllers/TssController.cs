@@ -23,7 +23,10 @@ namespace Tss.Api.Controllers
 		[HttpGet]
 		public async Task<TryLoginResult> TryLogin()
 		{
-			return await _service.TryLogin();
+			return await _service.TryLogin()
+				.BiMapAsync(
+					url => new TryLoginResult(false, url),
+					_ => new TryLoginResult(true, null));
 		}
 
 		/// <summary>
@@ -62,7 +65,7 @@ namespace Tss.Api.Controllers
 		{
 			await _service.MoveCurrentToNotGood();
 		}
-		
+
 		/// <summary>
 		/// Cleanup the currently playing playlist.
 		/// </summary>

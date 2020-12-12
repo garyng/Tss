@@ -19,7 +19,7 @@ namespace Tss.Core
 		/// </summary>
 		public async Task Login()
 		{
-			var server = new EmbedIOAuthServer(new Uri(_callbackUrl), _callbackPort);
+			var server = new EmbedIOAuthServer(new Uri(_config.CallbackUrl), _config.CallbackPort);
 			await server.Start();
 
 			var auth = new TaskCompletionSource();
@@ -30,12 +30,13 @@ namespace Tss.Core
 			};
 
 			var result = await TryLogin();
-			if (!result.Success)
-			{
-				BrowserUtil.Open(new Uri(result.LoginUrl!));
-				await auth.Task;
-			}
 
+			await result.IfSomeAsync(async url =>
+			{
+				BrowserUtil.Open(new Uri(url));
+				await auth.Task;
+			});
+			
 			await server.Stop();
 			server.Dispose();
 		}

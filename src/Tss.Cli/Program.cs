@@ -75,7 +75,8 @@ namespace Tss.Cli
 		public async Task Run()
 		{
 			await _service.Login();
-			await _service.MoveCurrentToGood();
+			// await _service.CleanupCurrentPlaylist();
+			// await _service.MoveCurrentToGood();
 			// await _service.MoveCurrentToNotGood();
 		}
 	}
