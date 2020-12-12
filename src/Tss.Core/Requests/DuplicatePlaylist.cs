@@ -15,18 +15,32 @@ namespace Tss.Core.Requests
 
 	public class DuplicatePlaylistRequestHandler : IRequestHandler<DuplicatePlaylist, Void>
 	{
+		private readonly ILogger<DuplicatePlaylistRequestHandler> _logger;
+
+		public DuplicatePlaylistRequestHandler(ILogger<DuplicatePlaylistRequestHandler> logger)
+		{
+			_logger = logger;
+		}
+
 		public async Task<Void> Handle(DuplicatePlaylist request, CancellationToken cancellationToken)
 		{
 			var (client, playlist) = request;
 			var userId = (await client.UserProfile.Current()).Id;
 
-			var page = playlist.Tracks;
+			var tracks = playlist.Tracks;
 
 			var name = $"{playlist.Name} ({DateTime.Now:yyyyMMdd-HHmmss})";
 
+			if (tracks.Count == 0)
+			{
+				_logger.LogInformation("{playlist} is empty, skip duplicating", playlist);
+				return Void.Default;
+			}
+
 			var backup = await client.Playlists.Create(userId, new PlaylistCreateRequest(name));
 
-			var batches = page.Batch(99);
+			var batches = tracks
+				.Batch(99);
 
 			await batches
 				.Select(uris => new PlaylistAddItemsRequest(uris
@@ -35,7 +49,7 @@ namespace Tss.Core.Requests
 				.ToAsyncEnumerable()
 				.SelectAwait(async r => await client.Playlists.AddItems(backup.Id, r))
 				.ToListAsync(cancellationToken);
-			
+
 			return Void.Value;
 		}
 	}
