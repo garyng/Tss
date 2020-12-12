@@ -2,7 +2,7 @@
 using GaryNg.Utils.Void;
 using LanguageExt;
 
-namespace Tss.Core.Requests
+namespace Tss.Core.Extensions
 {
 	public static class TaskExtensions
 	{

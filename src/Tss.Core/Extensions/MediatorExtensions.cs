@@ -2,7 +2,7 @@
 using LanguageExt;
 using MediatR;
 
-namespace Tss.Core.Requests
+namespace Tss.Core.Extensions
 {
 	public static class MediatorExtensions
 	{

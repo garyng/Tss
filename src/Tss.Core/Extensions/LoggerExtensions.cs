@@ -2,7 +2,7 @@
 using LanguageExt;
 using Microsoft.Extensions.Logging;
 
-namespace Tss.Core.Requests
+namespace Tss.Core.Extensions
 {
 	/// <summary>
 	/// Extension to <see cref="ILogger{T}"/> which returns <see cref="Unit"/> instead of <see cref="Void"/>.

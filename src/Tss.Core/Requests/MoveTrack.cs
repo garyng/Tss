@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using SpotifyAPI.Web;
+using Tss.Core.Extensions;
 using Tss.Core.Models;
 using Void = GaryNg.Utils.Void.Void;
 
